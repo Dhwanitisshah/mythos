@@ -1,6 +1,19 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
+import type { Quest } from "@/lib/ai";
 import { SignOutButton } from "./sign-out-button";
+import { BeginChapterButton } from "./begin-chapter-button";
+import { QuestChecklist } from "./quest-checklist";
+
+function isToday(isoDate: string) {
+  const date = new Date(isoDate);
+  const now = new Date();
+  return (
+    date.getUTCFullYear() === now.getUTCFullYear() &&
+    date.getUTCMonth() === now.getUTCMonth() &&
+    date.getUTCDate() === now.getUTCDate()
+  );
+}
 
 export default async function JourneyPage() {
   const supabase = await createClient();
@@ -12,10 +25,77 @@ export default async function JourneyPage() {
     redirect("/login");
   }
 
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("onboarded_at")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!profile?.onboarded_at) {
+    redirect("/onboarding");
+  }
+
+  const { data: goal } = await supabase
+    .from("goals")
+    .select("id, title, category")
+    .eq("user_id", user.id)
+    .eq("status", "active")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { data: chapters } = goal
+    ? await supabase
+        .from("chapters")
+        .select("id, chapter_number, title, narrative, quests, created_at")
+        .eq("goal_id", goal.id)
+        .order("chapter_number", { ascending: false })
+        .limit(1)
+    : { data: null };
+
+  const latestChapter = chapters?.[0] ?? null;
+  const hasTodaysChapter = latestChapter ? isToday(latestChapter.created_at) : false;
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-6 p-8">
-      <h1 className="text-2xl font-semibold">Welcome, {user.email}</h1>
-      <SignOutButton />
+    <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-8 p-8">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Your Journey</h1>
+        <SignOutButton />
+      </div>
+
+      {!goal ? (
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          You don&apos;t have an active goal yet.
+        </p>
+      ) : (
+        <>
+          <section className="rounded border border-gray-300 p-4 dark:border-gray-700">
+            <p className="text-xs uppercase tracking-wide text-gray-500">
+              {goal.category}
+            </p>
+            <h2 className="text-lg font-medium">{goal.title}</h2>
+          </section>
+
+          {!hasTodaysChapter ? (
+            <BeginChapterButton goalId={goal.id} />
+          ) : (
+            latestChapter && (
+              <article className="flex flex-col gap-4">
+                <h2 className="text-xl font-semibold">
+                  Chapter {latestChapter.chapter_number}: {latestChapter.title}
+                </h2>
+                <p className="whitespace-pre-wrap leading-relaxed text-gray-800 dark:text-gray-200">
+                  {latestChapter.narrative}
+                </p>
+                <QuestChecklist
+                  chapterId={latestChapter.id}
+                  quests={latestChapter.quests as Quest[]}
+                />
+              </article>
+            )
+          )}
+        </>
+      )}
     </main>
   );
 }
