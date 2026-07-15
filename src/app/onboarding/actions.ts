@@ -15,6 +15,7 @@ export async function completeOnboarding(formData: FormData) {
   };
   const goalTitle = String(formData.get("goalTitle") ?? "").trim();
   const goalCategory = String(formData.get("goalCategory") ?? "");
+  const timezone = String(formData.get("timezone") ?? "").trim();
 
   if (
     !identity.dream ||
@@ -40,6 +41,7 @@ export async function completeOnboarding(formData: FormData) {
     id: user.id,
     identity,
     onboarded_at: new Date().toISOString(),
+    timezone: timezone || null,
   });
 
   if (profileError) {

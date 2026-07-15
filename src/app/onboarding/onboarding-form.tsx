@@ -40,6 +40,7 @@ export function OnboardingForm() {
     formData.set("value", value);
     formData.set("goalTitle", goalTitle);
     formData.set("goalCategory", goalCategory);
+    formData.set("timezone", Intl.DateTimeFormat().resolvedOptions().timeZone ?? "");
 
     startTransition(async () => {
       try {

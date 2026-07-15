@@ -1,10 +1,11 @@
--- Mythos Phase 1 schema
+-- Mythos canonical schema (Phase 1 + Phase 2)
 -- Paste this entire file into the Supabase SQL editor and run it.
 
 create table if not exists profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   identity jsonb not null default '{}'::jsonb,
   onboarded_at timestamptz,
+  timezone text,
   created_at timestamptz not null default now()
 );
 
@@ -25,6 +26,9 @@ create table if not exists chapters (
   title text not null,
   narrative text not null,
   quests jsonb not null default '[]'::jsonb,
+  reflection text,
+  reflection_extracted jsonb,
+  reflected_at timestamptz,
   created_at timestamptz not null default now()
 );
 

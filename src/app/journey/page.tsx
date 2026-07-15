@@ -1,19 +1,12 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
-import type { Quest } from "@/lib/ai";
+import type { Quest, ReflectionExtracted } from "@/lib/ai";
+import { isSameLocalDay } from "@/lib/timezone";
 import { SignOutButton } from "./sign-out-button";
 import { BeginChapterButton } from "./begin-chapter-button";
 import { QuestChecklist } from "./quest-checklist";
-
-function isToday(isoDate: string) {
-  const date = new Date(isoDate);
-  const now = new Date();
-  return (
-    date.getUTCFullYear() === now.getUTCFullYear() &&
-    date.getUTCMonth() === now.getUTCMonth() &&
-    date.getUTCDate() === now.getUTCDate()
-  );
-}
+import { ReflectionForm } from "./reflection-form";
+import { TimezoneSync } from "./timezone-sync";
 
 export default async function JourneyPage() {
   const supabase = await createClient();
@@ -27,7 +20,7 @@ export default async function JourneyPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("onboarded_at")
+    .select("onboarded_at, timezone")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -47,17 +40,25 @@ export default async function JourneyPage() {
   const { data: chapters } = goal
     ? await supabase
         .from("chapters")
-        .select("id, chapter_number, title, narrative, quests, created_at")
+        .select(
+          "id, chapter_number, title, narrative, quests, created_at, reflection, reflection_extracted, reflected_at",
+        )
         .eq("goal_id", goal.id)
         .order("chapter_number", { ascending: false })
         .limit(1)
     : { data: null };
 
   const latestChapter = chapters?.[0] ?? null;
-  const hasTodaysChapter = latestChapter ? isToday(latestChapter.created_at) : false;
+  const hasTodaysChapter = latestChapter
+    ? isSameLocalDay(latestChapter.created_at, profile.timezone)
+    : false;
+  const reflectionSummary = latestChapter?.reflection_extracted
+    ? (latestChapter.reflection_extracted as ReflectionExtracted).summary
+    : null;
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-8 p-8">
+      {!profile.timezone && <TimezoneSync />}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Your Journey</h1>
         <SignOutButton />
@@ -91,6 +92,19 @@ export default async function JourneyPage() {
                   chapterId={latestChapter.id}
                   quests={latestChapter.quests as Quest[]}
                 />
+
+                {!latestChapter.reflected_at ? (
+                  <ReflectionForm chapterId={latestChapter.id} />
+                ) : (
+                  <div className="flex flex-col gap-1 rounded border border-gray-300 p-4 dark:border-gray-700">
+                    <p className="whitespace-pre-wrap text-sm text-gray-800 dark:text-gray-200">
+                      {latestChapter.reflection}
+                    </p>
+                    {reflectionSummary && (
+                      <p className="text-xs italic text-gray-500">{reflectionSummary}</p>
+                    )}
+                  </div>
+                )}
               </article>
             )
           )}
