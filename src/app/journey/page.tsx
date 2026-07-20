@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import type { Quest, ReflectionExtracted } from "@/lib/ai";
@@ -55,13 +56,21 @@ export default async function JourneyPage() {
   const reflectionSummary = latestChapter?.reflection_extracted
     ? (latestChapter.reflection_extracted as ReflectionExtracted).summary
     : null;
+  const statChanges = latestChapter?.reflection_extracted
+    ? (latestChapter.reflection_extracted as ReflectionExtracted).statChanges
+    : null;
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-8 p-8">
       {!profile.timezone && <TimezoneSync />}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Your Journey</h1>
-        <SignOutButton />
+        <div className="flex items-center gap-4">
+          <Link href="/character" className="text-sm underline">
+            Character
+          </Link>
+          <SignOutButton />
+        </div>
       </div>
 
       {!goal ? (
@@ -103,6 +112,19 @@ export default async function JourneyPage() {
                     {reflectionSummary && (
                       <p className="text-xs italic text-gray-500">{reflectionSummary}</p>
                     )}
+                    {statChanges && statChanges.length > 0 && (
+                      <ul className="mt-2 flex flex-col gap-1">
+                        {statChanges.map((change, index) => (
+                          <li
+                            key={index}
+                            className="text-xs text-gray-500 dark:text-gray-400"
+                          >
+                            {capitalize(change.stat)} {change.delta > 0 ? "+" : ""}
+                            {change.delta} — {change.reason}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 )}
               </article>
@@ -112,4 +134,8 @@ export default async function JourneyPage() {
       )}
     </main>
   );
+}
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }

@@ -31,11 +31,29 @@ export type PreviousContext = {
   setbacks: string[];
 } | null;
 
+export const STAT_NAMES = [
+  "discipline",
+  "strength",
+  "wisdom",
+  "calm",
+  "honor",
+  "charisma",
+] as const;
+
+export type StatName = (typeof STAT_NAMES)[number];
+
+export type StatChange = {
+  stat: StatName;
+  delta: number;
+  reason: string;
+};
+
 export type ReflectionExtracted = {
   mood: string;
   wins: string[];
   setbacks: string[];
   summary: string;
+  statChanges: StatChange[];
 };
 
 type GenerateChapterInput = {
@@ -194,8 +212,20 @@ const reflectionSchema = {
     wins: { type: Type.ARRAY, items: { type: Type.STRING } },
     setbacks: { type: Type.ARRAY, items: { type: Type.STRING } },
     summary: { type: Type.STRING },
+    statChanges: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          stat: { type: Type.STRING, enum: [...STAT_NAMES] },
+          delta: { type: Type.INTEGER },
+          reason: { type: Type.STRING },
+        },
+        required: ["stat", "delta", "reason"],
+      },
+    },
   },
-  required: ["mood", "wins", "setbacks", "summary"],
+  required: ["mood", "wins", "setbacks", "summary", "statChanges"],
 };
 
 function buildReflectionPrompt(rawText: string): string {
@@ -211,7 +241,13 @@ Respond with JSON matching the schema:
 - mood: one or two words capturing their overall emotional state (e.g. "proud", "discouraged", "steady")
 - wins: a short list of concrete positive things they described (empty array if none)
 - setbacks: a short list of concrete struggles or setbacks they described (empty array if none)
-- summary: one sentence, in plain language, summarizing what happened`;
+- summary: one sentence, in plain language, summarizing what happened
+- statChanges: a list of character stat changes (discipline, strength, wisdom, calm, honor, charisma), each with a stat, delta, and reason. Follow these rules exactly:
+  - Only award changes grounded in what the user actually wrote. Never invent events.
+  - delta is an integer between -3 and +3. Most days should produce 1-3 changes, not six.
+  - Negative deltas are allowed and expected — skipped commitments cost something. This is a chronicle, not a cheerleader.
+  - reason is one short clause quoting the user's own substance, e.g. "walked 10k steps despite exhaustion".
+  - If the reflection is too thin to justify anything, return an empty array. An empty array is a valid, correct answer.`;
 }
 
 export async function extractReflection(rawText: string): Promise<ReflectionExtracted> {
@@ -249,7 +285,13 @@ export async function extractReflection(rawText: string): Promise<ReflectionExtr
     throw new Error("Reflection extraction failed: empty response from AI provider");
   }
 
-  let parsed: { mood?: unknown; wins?: unknown; setbacks?: unknown; summary?: unknown };
+  let parsed: {
+    mood?: unknown;
+    wins?: unknown;
+    setbacks?: unknown;
+    summary?: unknown;
+    statChanges?: unknown;
+  };
   try {
     parsed = JSON.parse(stripJsonFences(responseText));
   } catch (err) {
@@ -274,10 +316,27 @@ export async function extractReflection(rawText: string): Promise<ReflectionExtr
   const wins = parsed.wins.filter((w): w is string => typeof w === "string");
   const setbacks = parsed.setbacks.filter((s): s is string => typeof s === "string");
 
+  const statChanges: StatChange[] = Array.isArray(parsed.statChanges)
+    ? parsed.statChanges.filter((c): c is StatChange => {
+        if (typeof c !== "object" || c === null) return false;
+        const candidate = c as { stat?: unknown; delta?: unknown; reason?: unknown };
+        return (
+          typeof candidate.stat === "string" &&
+          (STAT_NAMES as readonly string[]).includes(candidate.stat) &&
+          typeof candidate.delta === "number" &&
+          Number.isInteger(candidate.delta) &&
+          candidate.delta >= -3 &&
+          candidate.delta <= 3 &&
+          typeof candidate.reason === "string"
+        );
+      })
+    : [];
+
   return {
     mood: parsed.mood,
     wins,
     setbacks,
     summary: parsed.summary,
+    statChanges,
   };
 }
