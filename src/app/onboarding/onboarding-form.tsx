@@ -2,14 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { completeOnboarding } from "./actions";
-
-const CATEGORIES = [
-  { value: "fitness", label: "Fitness" },
-  { value: "learning", label: "Learning" },
-  { value: "relationships", label: "Relationships" },
-  { value: "career", label: "Career" },
-  { value: "mind", label: "Mind" },
-] as const;
+import { KINGDOM_LIST } from "@/lib/kingdoms";
 
 const inputClass =
   "rounded border border-gray-300 px-3 py-2 dark:border-gray-700 dark:bg-transparent";
@@ -20,7 +13,7 @@ export function OnboardingForm() {
   const [strength, setStrength] = useState("");
   const [value, setValue] = useState("");
   const [goalTitle, setGoalTitle] = useState("");
-  const [goalCategory, setGoalCategory] = useState<string>(CATEGORIES[0].value);
+  const [goalKingdom, setGoalKingdom] = useState<string>(KINGDOM_LIST[0].key);
   const [error, setError] = useState("");
   const [isPending, startTransition] = useTransition();
 
@@ -39,7 +32,7 @@ export function OnboardingForm() {
     formData.set("strength", strength);
     formData.set("value", value);
     formData.set("goalTitle", goalTitle);
-    formData.set("goalCategory", goalCategory);
+    formData.set("goalKingdom", goalKingdom);
     formData.set("timezone", Intl.DateTimeFormat().resolvedOptions().timeZone ?? "");
 
     startTransition(async () => {
@@ -123,15 +116,15 @@ export function OnboardingForm() {
         </label>
 
         <label className="flex flex-col gap-1 text-sm">
-          Category
+          Kingdom
           <select
             className={inputClass}
-            value={goalCategory}
-            onChange={(e) => setGoalCategory(e.target.value)}
+            value={goalKingdom}
+            onChange={(e) => setGoalKingdom(e.target.value)}
           >
-            {CATEGORIES.map((c) => (
-              <option key={c.value} value={c.value}>
-                {c.label}
+            {KINGDOM_LIST.map((k) => (
+              <option key={k.key} value={k.key}>
+                {k.name}
               </option>
             ))}
           </select>

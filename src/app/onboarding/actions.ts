@@ -3,8 +3,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import type { Identity } from "@/lib/ai";
-
-const CATEGORIES = ["fitness", "learning", "relationships", "career", "mind"] as const;
+import { isKingdomKey } from "@/lib/kingdoms";
 
 export async function completeOnboarding(formData: FormData) {
   const identity: Identity = {
@@ -14,7 +13,7 @@ export async function completeOnboarding(formData: FormData) {
     value: String(formData.get("value") ?? "").trim(),
   };
   const goalTitle = String(formData.get("goalTitle") ?? "").trim();
-  const goalCategory = String(formData.get("goalCategory") ?? "");
+  const goalKingdom = String(formData.get("goalKingdom") ?? "");
   const timezone = String(formData.get("timezone") ?? "").trim();
 
   if (
@@ -23,7 +22,7 @@ export async function completeOnboarding(formData: FormData) {
     !identity.strength ||
     !identity.value ||
     !goalTitle ||
-    !CATEGORIES.includes(goalCategory as (typeof CATEGORIES)[number])
+    !isKingdomKey(goalKingdom)
   ) {
     throw new Error("All fields are required");
   }
@@ -51,7 +50,8 @@ export async function completeOnboarding(formData: FormData) {
   const { error: goalError } = await supabase.from("goals").insert({
     user_id: user.id,
     title: goalTitle,
-    category: goalCategory,
+    category: goalKingdom,
+    kingdom: goalKingdom,
   });
 
   if (goalError) {

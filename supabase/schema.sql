@@ -1,5 +1,10 @@
--- Mythos canonical schema (Phase 1 + Phase 2 + Phase 3)
+-- Mythos canonical schema (Phase 1 + Phase 2 + Phase 3 + Phase 4)
 -- Paste this entire file into the Supabase SQL editor and run it.
+--
+-- Phase 4 (kingdoms) note: the six life domains a goal can belong to are NOT
+-- a DB table — they're a fixed, code-level lookup (src/lib/kingdoms.ts).
+-- There are exactly six of them and they never vary per user, so a table
+-- would just add RLS + a join for no benefit.
 
 create table if not exists profiles (
   id uuid primary key references auth.users (id) on delete cascade,
@@ -14,6 +19,7 @@ create table if not exists goals (
   user_id uuid not null references auth.users (id) on delete cascade,
   title text not null,
   category text not null,
+  kingdom text, -- Phase 4: one of the six kingdom keys, see src/lib/kingdoms.ts
   status text not null default 'active',
   created_at timestamptz not null default now()
 );
@@ -21,11 +27,11 @@ create table if not exists goals (
 create table if not exists chapters (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
-  goal_id uuid not null references goals (id) on delete cascade,
-  chapter_number int not null,
+  goal_id uuid references goals (id) on delete cascade, -- Phase 4: nullable, a chapter can span kingdoms
+  chapter_number int not null, -- Phase 4: numbered per-user, was per-goal before
   title text not null,
   narrative text not null,
-  quests jsonb not null default '[]'::jsonb,
+  quests jsonb not null default '[]'::jsonb, -- Phase 4: items may carry an optional "kingdom" field
   reflection text,
   reflection_extracted jsonb,
   reflected_at timestamptz,
@@ -54,6 +60,7 @@ create table if not exists stat_events (
 );
 
 create index if not exists goals_user_id_idx on goals (user_id);
+create index if not exists goals_kingdom_idx on goals (kingdom);
 create index if not exists chapters_user_id_idx on chapters (user_id);
 create index if not exists chapters_goal_id_idx on chapters (goal_id);
 create index if not exists stat_events_user_id_idx on stat_events (user_id);

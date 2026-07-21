@@ -1,4 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
+import { KINGDOMS, type KingdomKey } from "./kingdoms";
 
 // "gemini-flash-latest" is Google's alias that always points at the current
 // recommended free-tier Flash model, so it survives model retirements (pinned
@@ -9,6 +10,9 @@ const MODEL_ID = "gemini-flash-latest";
 export type Quest = {
   text: string;
   done: boolean;
+  // Optional because quests written before Phase 4 have no kingdom — treat
+  // a missing value as unassigned, never backfill it.
+  kingdom?: KingdomKey;
 };
 
 export type Chapter = {
@@ -53,34 +57,53 @@ export type ReflectionExtracted = {
   wins: string[];
   setbacks: string[];
   summary: string;
-  statChanges: StatChange[];
 };
+
+// Each kingdom drives exactly one stat. Completing a quest tagged with a
+// kingdom directly awards its stat — see toggleQuest in journey/actions.ts.
+// Stats no longer come from parsing the reflection text.
+export const KINGDOM_STAT: Record<KingdomKey, StatName> = {
+  fitness: "strength",
+  learning: "wisdom",
+  relationships: "charisma",
+  career: "honor",
+  money: "discipline",
+  mind: "calm",
+};
+
+export type GoalInput = { title: string; kingdom: KingdomKey };
 
 type GenerateChapterInput = {
   identity: Identity;
-  goal: { title: string; category: string };
+  goals: GoalInput[];
+  // Kingdoms with an active goal but zero completed quests in the last 7
+  // days. Only these may be described as weakened — never invent neglect.
+  neglectedKingdoms: KingdomKey[];
   chapterNumber: number;
   previousContext?: PreviousContext;
 };
 
-const responseSchema = {
-  type: Type.OBJECT,
-  properties: {
-    title: { type: Type.STRING },
-    narrative: { type: Type.STRING },
-    quests: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          text: { type: Type.STRING },
+function buildResponseSchema(kingdomKeys: KingdomKey[]) {
+  return {
+    type: Type.OBJECT,
+    properties: {
+      title: { type: Type.STRING },
+      narrative: { type: Type.STRING },
+      quests: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            text: { type: Type.STRING },
+            kingdom: { type: Type.STRING, enum: kingdomKeys },
+          },
+          required: ["text", "kingdom"],
         },
-        required: ["text"],
       },
     },
-  },
-  required: ["title", "narrative", "quests"],
-};
+    required: ["title", "narrative", "quests"],
+  };
+}
 
 function buildPreviousContextSection(previousContext: PreviousContext): string {
   if (!previousContext) return "";
@@ -100,8 +123,24 @@ ${setbacks}
 This chapter must acknowledge what happened in the previous chapter, using ONLY the facts given above — do not invent events that were not stated. Setbacks should weaken the "kingdom" or raise the stakes; wins should strengthen it.`;
 }
 
-function buildPrompt({ identity, goal, chapterNumber, previousContext }: GenerateChapterInput) {
-  return `You are the narrator of a dark, elegant, cinematic epic — think Game of Thrones crossed with Persona 5. You are writing chapter ${chapterNumber} of the reader's own story, addressed to them in second person ("you").
+function buildGoalsSection(goals: GoalInput[]): string {
+  return goals.map((g) => `- ${KINGDOMS[g.kingdom]} (kingdom key: ${g.kingdom}): "${g.title}"`).join("\n");
+}
+
+function buildNeglectSection(neglectedKingdoms: KingdomKey[]): string {
+  if (neglectedKingdoms.length === 0) return "";
+  const names = neglectedKingdoms.map((k) => KINGDOMS[k]).join(", ");
+  return `\n\nThe following kingdoms have been neglected — no quest tied to them has been completed in the last 7 days: ${names}. The narrative may acknowledge that these specific kingdoms have weakened, but ONLY because that fact is given to you here — never invent or imply neglect for any kingdom not listed above.`;
+}
+
+function buildPrompt({
+  identity,
+  goals,
+  neglectedKingdoms,
+  chapterNumber,
+  previousContext,
+}: GenerateChapterInput) {
+  return `You are the narrator of a dark, elegant, cinematic epic — think Game of Thrones crossed with Persona 5. You are writing chapter ${chapterNumber} of the reader's own story, addressed to them in second person ("you"). The reader rules several kingdoms, each a real-world goal in a different domain of their life.
 
 The reader:
 - Their deepest dream: ${identity.dream}
@@ -109,12 +148,14 @@ The reader:
 - Their greatest strength: ${identity.strength}
 - A core value they hold: ${identity.value}
 
-Their current real-world goal (category: ${goal.category}): "${goal.title}"
+Their active kingdoms and the real-world goal each represents:
+${buildGoalsSection(goals)}
+${buildNeglectSection(neglectedKingdoms)}
 ${buildPreviousContextSection(previousContext ?? null)}
 
-Write this chapter so it transforms their real goal into a mythic story beat — treat the goal as a trial, quest, or turning point in an unfolding saga. Weave in their dream, fear, strength, and value as narrative texture, not as a checklist. Tone: dark, elegant, cinematic prose. Keep the narrative between 120 and 180 words.
+Write ONE single, unified chapter that weaves together whichever of these kingdoms are relevant today into one continuous narrative — do NOT write separate sections, headers, or paragraphs per kingdom or goal. This is one story with one throughline, even though it touches multiple kingdoms. Weave in the reader's dream, fear, strength, and value as narrative texture, not as a checklist. Tone: dark, elegant, cinematic prose. Keep the narrative between 120 and 180 words.
 
-Then produce 2-3 concrete, real-world quests (small, specific, actionable tasks the reader can actually go do today or this week) that would advance their goal. Phrase each quest in the voice of the story (as if it were a task assigned within the narrative), but it must map to a real, doable action.
+Then produce between 2 and 4 concrete, real-world quests TOTAL across ALL kingdoms combined — not per kingdom. Each quest must be a small, specific, actionable task the reader can actually go do today or this week, phrased in the voice of the story, and each must be tagged with the kingdom key (from the list above) it serves.
 
 For the title, write only the chapter's name itself — do not prefix it with "Chapter ${chapterNumber}" or any chapter number, since that is added separately by the app.
 
@@ -135,7 +176,12 @@ export async function generateChapter(
     throw new Error("GEMINI_API_KEY is not set");
   }
 
+  if (input.goals.length === 0) {
+    throw new Error("Chapter generation failed: no active goals were provided");
+  }
+
   const ai = new GoogleGenAI({ apiKey });
+  const kingdomKeys = input.goals.map((g) => g.kingdom);
 
   let rawText: string | undefined;
   try {
@@ -144,7 +190,7 @@ export async function generateChapter(
       contents: buildPrompt(input),
       config: {
         responseMimeType: "application/json",
-        responseSchema,
+        responseSchema: buildResponseSchema(kingdomKeys),
       },
     });
     rawText = response.text;
@@ -185,12 +231,19 @@ export async function generateChapter(
     );
   }
 
+  const kingdomKeySet = new Set<string>(kingdomKeys);
+
   const quests: Quest[] = parsed.quests
-    .filter(
-      (q): q is { text: string } =>
-        typeof q === "object" && q !== null && typeof (q as { text?: unknown }).text === "string",
-    )
-    .map((q) => ({ text: q.text, done: false }));
+    .filter((q): q is { text: string; kingdom: string } => {
+      if (typeof q !== "object" || q === null) return false;
+      const candidate = q as { text?: unknown; kingdom?: unknown };
+      return (
+        typeof candidate.text === "string" &&
+        typeof candidate.kingdom === "string" &&
+        kingdomKeySet.has(candidate.kingdom)
+      );
+    })
+    .map((q) => ({ text: q.text, done: false, kingdom: q.kingdom as KingdomKey }));
 
   if (quests.length === 0) {
     throw new Error("Chapter generation failed: AI response contained no valid quests");
@@ -212,20 +265,8 @@ const reflectionSchema = {
     wins: { type: Type.ARRAY, items: { type: Type.STRING } },
     setbacks: { type: Type.ARRAY, items: { type: Type.STRING } },
     summary: { type: Type.STRING },
-    statChanges: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          stat: { type: Type.STRING, enum: [...STAT_NAMES] },
-          delta: { type: Type.INTEGER },
-          reason: { type: Type.STRING },
-        },
-        required: ["stat", "delta", "reason"],
-      },
-    },
   },
-  required: ["mood", "wins", "setbacks", "summary", "statChanges"],
+  required: ["mood", "wins", "setbacks", "summary"],
 };
 
 function buildReflectionPrompt(rawText: string): string {
@@ -241,13 +282,7 @@ Respond with JSON matching the schema:
 - mood: one or two words capturing their overall emotional state (e.g. "proud", "discouraged", "steady")
 - wins: a short list of concrete positive things they described (empty array if none)
 - setbacks: a short list of concrete struggles or setbacks they described (empty array if none)
-- summary: one sentence, in plain language, summarizing what happened
-- statChanges: a list of character stat changes (discipline, strength, wisdom, calm, honor, charisma), each with a stat, delta, and reason. Follow these rules exactly:
-  - Only award changes grounded in what the user actually wrote. Never invent events.
-  - delta is an integer between -3 and +3. Most days should produce 1-3 changes, not six.
-  - Negative deltas are allowed and expected — skipped commitments cost something. This is a chronicle, not a cheerleader.
-  - reason is one short clause quoting the user's own substance, e.g. "walked 10k steps despite exhaustion".
-  - If the reflection is too thin to justify anything, return an empty array. An empty array is a valid, correct answer.`;
+- summary: one sentence, in plain language, summarizing what happened`;
 }
 
 export async function extractReflection(rawText: string): Promise<ReflectionExtracted> {
@@ -290,7 +325,6 @@ export async function extractReflection(rawText: string): Promise<ReflectionExtr
     wins?: unknown;
     setbacks?: unknown;
     summary?: unknown;
-    statChanges?: unknown;
   };
   try {
     parsed = JSON.parse(stripJsonFences(responseText));
@@ -316,27 +350,10 @@ export async function extractReflection(rawText: string): Promise<ReflectionExtr
   const wins = parsed.wins.filter((w): w is string => typeof w === "string");
   const setbacks = parsed.setbacks.filter((s): s is string => typeof s === "string");
 
-  const statChanges: StatChange[] = Array.isArray(parsed.statChanges)
-    ? parsed.statChanges.filter((c): c is StatChange => {
-        if (typeof c !== "object" || c === null) return false;
-        const candidate = c as { stat?: unknown; delta?: unknown; reason?: unknown };
-        return (
-          typeof candidate.stat === "string" &&
-          (STAT_NAMES as readonly string[]).includes(candidate.stat) &&
-          typeof candidate.delta === "number" &&
-          Number.isInteger(candidate.delta) &&
-          candidate.delta >= -3 &&
-          candidate.delta <= 3 &&
-          typeof candidate.reason === "string"
-        );
-      })
-    : [];
-
   return {
     mood: parsed.mood,
     wins,
     setbacks,
     summary: parsed.summary,
-    statChanges,
   };
 }

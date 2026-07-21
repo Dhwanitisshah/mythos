@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { beginTodaysChapter } from "./actions";
 
-export function BeginChapterButton({ goalId }: { goalId: string }) {
+export function BeginChapterButton() {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState("");
 
@@ -11,7 +11,7 @@ export function BeginChapterButton({ goalId }: { goalId: string }) {
     setError("");
     startTransition(async () => {
       try {
-        await beginTodaysChapter(goalId);
+        await beginTodaysChapter();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Something went wrong.");
       }

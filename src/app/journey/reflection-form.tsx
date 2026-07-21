@@ -6,7 +6,6 @@ import { submitReflection } from "./actions";
 export function ReflectionForm({ chapterId }: { chapterId: string }) {
   const [text, setText] = useState("");
   const [error, setError] = useState("");
-  const [statsError, setStatsError] = useState("");
   const [isPending, startTransition] = useTransition();
 
   function handleSubmit(e: React.FormEvent) {
@@ -20,10 +19,7 @@ export function ReflectionForm({ chapterId }: { chapterId: string }) {
 
     startTransition(async () => {
       try {
-        const result = await submitReflection(chapterId, text);
-        if (result.statsError) {
-          setStatsError(result.statsError);
-        }
+        await submitReflection(chapterId, text);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Something went wrong.");
       }
@@ -44,11 +40,6 @@ export function ReflectionForm({ chapterId }: { chapterId: string }) {
         />
       </label>
       {error && <p className="text-sm text-red-600">{error}</p>}
-      {statsError && (
-        <p className="text-xs text-red-600">
-          Your reflection was saved, but stat updates failed: {statsError}
-        </p>
-      )}
       <button
         type="submit"
         disabled={isPending}

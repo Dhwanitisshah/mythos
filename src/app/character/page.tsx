@@ -53,9 +53,14 @@ export default async function CharacterPage() {
     <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-8 p-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Character</h1>
-        <Link href="/journey" className="text-sm underline">
-          Journey
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link href="/journey" className="text-sm underline">
+            Journey
+          </Link>
+          <Link href="/kingdoms" className="text-sm underline">
+            Kingdoms
+          </Link>
+        </div>
       </div>
 
       <section className="flex flex-col gap-4">

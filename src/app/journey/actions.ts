@@ -6,13 +6,19 @@ import { createClient } from "@/utils/supabase/server";
 import {
   extractReflection,
   generateChapter,
+  KINGDOM_STAT,
   STAT_NAMES,
+  type GoalInput,
   type Identity,
   type PreviousContext,
   type Quest,
   type ReflectionExtracted,
+  type StatChange,
   type StatName,
 } from "@/lib/ai";
+import { isKingdomKey, type KingdomKey } from "@/lib/kingdoms";
+
+const NEGLECT_WINDOW_DAYS = 7;
 
 const STAT_MIN = 0;
 const STAT_MAX = 100;
@@ -25,7 +31,7 @@ async function applyStatChanges(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
   chapterId: string,
-  statChanges: ReflectionExtracted["statChanges"],
+  statChanges: StatChange[],
 ): Promise<void> {
   if (statChanges.length === 0) return;
 
@@ -78,7 +84,7 @@ async function applyStatChanges(
   }
 }
 
-export async function beginTodaysChapter(goalId: string) {
+export async function beginTodaysChapter() {
   const supabase = await createClient();
   const {
     data: { user },
@@ -98,20 +104,29 @@ export async function beginTodaysChapter(goalId: string) {
     throw new Error("Could not load your profile");
   }
 
-  const { data: goal, error: goalError } = await supabase
+  const { data: activeGoals, error: goalsError } = await supabase
     .from("goals")
-    .select("id, title, category")
-    .eq("id", goalId)
-    .single();
+    .select("id, title, kingdom")
+    .eq("user_id", user.id)
+    .eq("status", "active")
+    .order("created_at", { ascending: true });
 
-  if (goalError || !goal) {
-    throw new Error("Could not load your goal");
+  if (goalsError) {
+    throw new Error("Could not load your goals");
+  }
+
+  const goals: GoalInput[] = (activeGoals ?? [])
+    .filter((g) => isKingdomKey(g.kingdom))
+    .map((g) => ({ title: g.title, kingdom: g.kingdom as KingdomKey }));
+
+  if (goals.length === 0) {
+    throw new Error("You don't have any active goals yet — set one in Kingdoms first.");
   }
 
   const { count, error: countError } = await supabase
     .from("chapters")
     .select("id", { count: "exact", head: true })
-    .eq("goal_id", goal.id);
+    .eq("user_id", user.id);
 
   if (countError) {
     throw new Error("Could not determine the next chapter number");
@@ -119,10 +134,36 @@ export async function beginTodaysChapter(goalId: string) {
 
   const chapterNumber = (count ?? 0) + 1;
 
+  const neglectWindowStart = new Date(
+    Date.now() - NEGLECT_WINDOW_DAYS * 24 * 60 * 60 * 1000,
+  ).toISOString();
+
+  const { data: recentChapters, error: recentError } = await supabase
+    .from("chapters")
+    .select("quests")
+    .eq("user_id", user.id)
+    .gte("created_at", neglectWindowStart);
+
+  if (recentError) {
+    throw new Error("Could not determine kingdom activity");
+  }
+
+  const completedKingdoms = new Set<string>();
+  for (const chapter of recentChapters ?? []) {
+    for (const quest of (chapter.quests as Quest[]) ?? []) {
+      if (quest.done && quest.kingdom) {
+        completedKingdoms.add(quest.kingdom);
+      }
+    }
+  }
+
+  const activeKingdoms = [...new Set(goals.map((g) => g.kingdom))];
+  const neglectedKingdoms = activeKingdoms.filter((k) => !completedKingdoms.has(k));
+
   const { data: priorChapters, error: priorError } = await supabase
     .from("chapters")
     .select("title, reflection_extracted")
-    .eq("goal_id", goal.id)
+    .eq("user_id", user.id)
     .not("reflection_extracted", "is", null)
     .order("chapter_number", { ascending: false })
     .limit(1);
@@ -146,14 +187,15 @@ export async function beginTodaysChapter(goalId: string) {
 
   const chapter = await generateChapter({
     identity: profile.identity as Identity,
-    goal: { title: goal.title, category: goal.category },
+    goals,
+    neglectedKingdoms,
     chapterNumber,
     previousContext,
   });
 
   const { error: insertError } = await supabase.from("chapters").insert({
     user_id: user.id,
-    goal_id: goal.id,
+    goal_id: null,
     chapter_number: chapterNumber,
     title: chapter.title,
     narrative: chapter.narrative,
@@ -188,11 +230,13 @@ export async function toggleQuest(chapterId: string, questIndex: number) {
   }
 
   const quests = chapter.quests as Quest[];
-  if (!quests[questIndex]) {
+  const quest = quests[questIndex];
+  if (!quest) {
     throw new Error("Quest not found");
   }
 
-  quests[questIndex] = { ...quests[questIndex], done: !quests[questIndex].done };
+  const nowDone = !quest.done;
+  quests[questIndex] = { ...quest, done: nowDone };
 
   const { error: updateError } = await supabase
     .from("chapters")
@@ -203,7 +247,25 @@ export async function toggleQuest(chapterId: string, questIndex: number) {
     throw new Error(`Failed to update quest: ${updateError.message}`);
   }
 
+  let statsError: string | null = null;
+  if (quest.kingdom) {
+    const stat = KINGDOM_STAT[quest.kingdom];
+    const delta = nowDone ? 1 : -1;
+    const reason = nowDone
+      ? `Completed quest: "${quest.text}"`
+      : `Reopened quest: "${quest.text}"`;
+
+    try {
+      await applyStatChanges(supabase, user.id, chapterId, [{ stat, delta, reason }]);
+    } catch (err) {
+      statsError = err instanceof Error ? err.message : "Failed to update stats";
+    }
+  }
+
   revalidatePath("/journey");
+  revalidatePath("/character");
+
+  return { statsError };
 }
 
 export async function submitReflection(chapterId: string, text: string) {
@@ -253,17 +315,7 @@ export async function submitReflection(chapterId: string, text: string) {
     throw new Error(`Failed to save reflection: ${updateError.message}`);
   }
 
-  let statsError: string | null = null;
-  try {
-    await applyStatChanges(supabase, user.id, chapterId, extracted.statChanges);
-  } catch (err) {
-    statsError = err instanceof Error ? err.message : "Failed to update stats";
-  }
-
   revalidatePath("/journey");
-  revalidatePath("/character");
-
-  return { statChanges: extracted.statChanges, statsError };
 }
 
 export async function setProfileTimezone(timezone: string) {
