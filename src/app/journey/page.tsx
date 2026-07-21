@@ -44,7 +44,7 @@ export default async function JourneyPage() {
   const { data: chapters } = await supabase
     .from("chapters")
     .select(
-      "id, chapter_number, title, narrative, quests, created_at, reflection, reflection_extracted, reflected_at",
+      "id, chapter_number, title, narrative, quests, created_at, reflection, reflection_extracted, reflected_at, generated_by",
     )
     .eq("user_id", user.id)
     .order("chapter_number", { ascending: false })
@@ -113,9 +113,14 @@ export default async function JourneyPage() {
           ) : (
             latestChapter && (
               <article className="flex flex-col gap-4">
-                <h2 className="text-xl font-semibold">
-                  Chapter {latestChapter.chapter_number}: {latestChapter.title}
-                </h2>
+                <div className="flex flex-col gap-1">
+                  <h2 className="text-xl font-semibold">
+                    Chapter {latestChapter.chapter_number}: {latestChapter.title}
+                  </h2>
+                  {latestChapter.generated_by === "auto" && (
+                    <p className="text-xs text-gray-500">Written for you this morning</p>
+                  )}
+                </div>
                 <p className="whitespace-pre-wrap leading-relaxed text-gray-800 dark:text-gray-200">
                   {latestChapter.narrative}
                 </p>

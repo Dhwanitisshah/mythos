@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { STAT_NAMES, type StatName } from "@/lib/ai";
+import { AutoChapterToggle } from "./auto-chapter-toggle";
 
 const DEFAULT_STATS: Record<StatName, number> = {
   discipline: 10,
@@ -24,7 +25,7 @@ export default async function CharacterPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("onboarded_at")
+    .select("onboarded_at, auto_chapter")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -62,6 +63,10 @@ export default async function CharacterPage() {
           </Link>
         </div>
       </div>
+
+      <section className="rounded border border-gray-300 p-4 dark:border-gray-700">
+        <AutoChapterToggle initialValue={profile.auto_chapter ?? true} />
+      </section>
 
       <section className="flex flex-col gap-4">
         {STAT_NAMES.map((stat) => (

@@ -13,3 +13,14 @@ export function isSameLocalDay(isoDate: string, timeZone: string | null): boolea
   const zone = timeZone ?? "UTC";
   return localDayKey(new Date(isoDate), zone) === localDayKey(new Date(), zone);
 }
+
+// Current local hour (0-23) in the given IANA timezone, used by the cron
+// route to only generate chapters during a user's morning window.
+export function getLocalHour(timeZone: string, date: Date = new Date()): number {
+  const hourString = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour: "2-digit",
+    hourCycle: "h23",
+  }).format(date);
+  return Number.parseInt(hourString, 10);
+}

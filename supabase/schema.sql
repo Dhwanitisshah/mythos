@@ -1,16 +1,22 @@
--- Mythos canonical schema (Phase 1 + Phase 2 + Phase 3 + Phase 4)
+-- Mythos canonical schema (Phase 1 + Phase 2 + Phase 3 + Phase 4 + Phase 5)
 -- Paste this entire file into the Supabase SQL editor and run it.
 --
 -- Phase 4 (kingdoms) note: the six life domains a goal can belong to are NOT
 -- a DB table — they're a fixed, code-level lookup (src/lib/kingdoms.ts).
 -- There are exactly six of them and they never vary per user, so a table
 -- would just add RLS + a join for no benefit.
+--
+-- Phase 5 (morning auto-writer) note: the cron route that generates chapters
+-- overnight runs with NO user session, so it uses the Supabase service role
+-- key (src/utils/supabase/admin.ts) which bypasses RLS entirely. Every query
+-- in that code path filters by user_id explicitly in application code.
 
 create table if not exists profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   identity jsonb not null default '{}'::jsonb,
   onboarded_at timestamptz,
   timezone text,
+  auto_chapter boolean not null default true, -- Phase 5: opt out of overnight auto-writer
   created_at timestamptz not null default now()
 );
 
@@ -35,6 +41,7 @@ create table if not exists chapters (
   reflection text,
   reflection_extracted jsonb,
   reflected_at timestamptz,
+  generated_by text not null default 'manual', -- Phase 5: 'manual' | 'auto'
   created_at timestamptz not null default now()
 );
 
