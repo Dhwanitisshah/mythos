@@ -59,6 +59,30 @@ export type ReflectionExtracted = {
   summary: string;
 };
 
+export type BookChapterInput = {
+  number: number;
+  title: string;
+  reflectionSummary: string | null;
+  mood: string | null;
+  wins: string[];
+  setbacks: string[];
+};
+
+export type StatDelta = {
+  stat: StatName;
+  net: number;
+};
+
+export type QuestsCompletedByKingdom = {
+  kingdom: string;
+  count: number;
+};
+
+export type Book = {
+  title: string;
+  narrative: string;
+};
+
 // Each kingdom drives exactly one stat. Completing a quest tagged with a
 // kingdom directly awards its stat — see toggleQuest in journey/actions.ts.
 // Stats no longer come from parsing the reflection text.
@@ -355,5 +379,136 @@ export async function extractReflection(rawText: string): Promise<ReflectionExtr
     wins,
     setbacks,
     summary: parsed.summary,
+  };
+}
+
+type GenerateBookInput = {
+  identity: Identity;
+  periodLabel: string;
+  chapters: BookChapterInput[];
+  statDeltas: StatDelta[];
+  questsCompleted: QuestsCompletedByKingdom[];
+  kingdoms: string[];
+};
+
+const bookSchema = {
+  type: Type.OBJECT,
+  properties: {
+    title: { type: Type.STRING },
+    narrative: { type: Type.STRING },
+  },
+  required: ["title", "narrative"],
+};
+
+function buildBookChaptersSection(chapters: BookChapterInput[]): string {
+  return chapters
+    .map((c) => {
+      const parts = [`Chapter ${c.number}: "${c.title}"`];
+      if (c.mood) parts.push(`mood: ${c.mood}`);
+      if (c.reflectionSummary) parts.push(`what happened: ${c.reflectionSummary}`);
+      if (c.wins.length > 0) parts.push(`wins: ${c.wins.join("; ")}`);
+      if (c.setbacks.length > 0) parts.push(`setbacks: ${c.setbacks.join("; ")}`);
+      return `- ${parts.join(" | ")}`;
+    })
+    .join("\n");
+}
+
+function buildStatDeltasSection(statDeltas: StatDelta[]): string {
+  const nonZero = statDeltas.filter((s) => s.net !== 0);
+  if (nonZero.length === 0) return "No measurable stat movement this period.";
+  return nonZero.map((s) => `${s.stat} ${s.net > 0 ? "+" : ""}${s.net}`).join(", ");
+}
+
+function buildQuestsCompletedSection(questsCompleted: QuestsCompletedByKingdom[]): string {
+  if (questsCompleted.length === 0) return "No quests were completed this period.";
+  return questsCompleted.map((q) => `${q.kingdom}: ${q.count} completed`).join(", ");
+}
+
+function buildBookPrompt(input: GenerateBookInput): string {
+  return `You are the narrator of a dark, elegant, cinematic epic — the same voice that writes the reader's daily chapters. You are now writing a Book: a period summary covering ${input.periodLabel}, addressed to the reader in second person ("you").
+
+The reader:
+- Their deepest dream: ${input.identity.dream}
+- Their greatest fear: ${input.identity.fear}
+- Their greatest strength: ${input.identity.strength}
+- A core value they hold: ${input.identity.value}
+
+Their active kingdoms during this period: ${input.kingdoms.length > 0 ? input.kingdoms.join(", ") : "none currently active"}.
+
+The record of what happened, chapter by chapter — this is the ONLY source of truth for this period. Do not use anything not stated here:
+${buildBookChaptersSection(input.chapters)}
+
+Quests completed by kingdom this period (evidence, not content to recite): ${buildQuestsCompletedSection(input.questsCompleted)}
+Stat movement this period (evidence, not content to recite): ${buildStatDeltasSection(input.statDeltas)}
+
+Write a Book: a single coherent narrative of this period, 250 to 400 words, in the same dark, elegant, cinematic second-person voice as the chapters. Rules:
+- Narrate the period as an arc with a real shape — what dominated, what was avoided, what shifted between the start and the end of the period. Name the tension honestly.
+- A period of mostly failure, stagnation, or avoidance is a valid and more interesting story than a fake triumph — do not manufacture growth, resolution, or drama that isn't in the record above.
+- Reference ONLY events, moods, wins, and setbacks that appear in the chapter record above. Never invent an event, a feeling, or a person that isn't stated there.
+- Do not list, recite, or enumerate the stat numbers or quest counts directly in the prose — they are evidence that should inform the tone and shape of the story, never content that appears as numbers or tallies.
+- If the record above is thin (few chapters, little in the reflections), write something short and honest about a quiet, uneventful period rather than padding it with invented incident. It is fine, and preferable, for the Book to land on the shorter end of the range in that case.
+
+For the title, write a book/chapter-style title, e.g. "Book I: The Architect's Resolve" — evocative, not literal, and not a restatement of the period's dates.
+
+Respond with JSON matching the provided schema only.`;
+}
+
+export async function generateBook(input: GenerateBookInput): Promise<Book> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY is not set");
+  }
+
+  if (input.chapters.length === 0) {
+    throw new Error("Book generation failed: no chapters were provided");
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
+
+  let rawText: string | undefined;
+  try {
+    const response = await ai.models.generateContent({
+      model: MODEL_ID,
+      contents: buildBookPrompt(input),
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: bookSchema,
+      },
+    });
+    rawText = response.text;
+  } catch (err) {
+    const cause =
+      err instanceof Error && err.cause instanceof Error
+        ? ` — cause: ${err.cause.message}`
+        : "";
+    throw new Error(
+      `Book generation failed: request to the AI provider errored (${
+        err instanceof Error ? err.message : String(err)
+      }${cause})`,
+    );
+  }
+
+  if (!rawText) {
+    throw new Error("Book generation failed: empty response from AI provider");
+  }
+
+  let parsed: { title?: unknown; narrative?: unknown };
+  try {
+    parsed = JSON.parse(stripJsonFences(rawText));
+  } catch (err) {
+    throw new Error(
+      `Book generation failed: could not parse AI response as JSON (${
+        err instanceof Error ? err.message : String(err)
+      })`,
+    );
+  }
+
+  if (typeof parsed.title !== "string" || typeof parsed.narrative !== "string") {
+    throw new Error("Book generation failed: AI response did not match the expected shape");
+  }
+
+  return {
+    title: parsed.title,
+    narrative: parsed.narrative,
   };
 }

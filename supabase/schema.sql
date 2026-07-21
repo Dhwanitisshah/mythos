@@ -1,4 +1,4 @@
--- Mythos canonical schema (Phase 1 + Phase 2 + Phase 3 + Phase 4 + Phase 5)
+-- Mythos canonical schema (Phase 1 + Phase 2 + Phase 3 + Phase 4 + Phase 5 + Phase 7)
 -- Paste this entire file into the Supabase SQL editor and run it.
 --
 -- Phase 4 (kingdoms) note: the six life domains a goal can belong to are NOT
@@ -10,6 +10,12 @@
 -- overnight runs with NO user session, so it uses the Supabase service role
 -- key (src/utils/supabase/admin.ts) which bypasses RLS entirely. Every query
 -- in that code path filters by user_id explicitly in application code.
+--
+-- Phase 6 (visual identity) note: purely CSS/component work, no schema delta.
+--
+-- Phase 7 (the Book) note: period summaries are derived entirely from
+-- existing chapters/stat_events/goals — no new source-of-truth tables, just
+-- the `books` table below to persist the generated summary itself.
 
 create table if not exists profiles (
   id uuid primary key references auth.users (id) on delete cascade,
@@ -66,11 +72,25 @@ create table if not exists stat_events (
   created_at timestamptz not null default now()
 );
 
+create table if not exists books (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  period_start date not null,
+  period_end date not null,
+  title text not null,
+  narrative text not null,
+  stats_snapshot jsonb not null,      -- the six stats and their net change over the period
+  source_chapter_ids uuid[] not null, -- provenance: exactly which chapters fed this Book
+  created_at timestamptz not null default now(),
+  constraint books_user_period_unique unique (user_id, period_start, period_end)
+);
+
 create index if not exists goals_user_id_idx on goals (user_id);
 create index if not exists goals_kingdom_idx on goals (kingdom);
 create index if not exists chapters_user_id_idx on chapters (user_id);
 create index if not exists chapters_goal_id_idx on chapters (goal_id);
 create index if not exists stat_events_user_id_idx on stat_events (user_id);
+create index if not exists books_user_id_idx on books (user_id);
 
 -- Row Level Security: each user may only read/write their own rows.
 
@@ -79,6 +99,7 @@ alter table goals enable row level security;
 alter table chapters enable row level security;
 alter table stats enable row level security;
 alter table stat_events enable row level security;
+alter table books enable row level security;
 
 drop policy if exists "profiles_select_own" on profiles;
 create policy "profiles_select_own" on profiles
@@ -138,3 +159,16 @@ create policy "stat_events_select_own" on stat_events
 drop policy if exists "stat_events_insert_own" on stat_events;
 create policy "stat_events_insert_own" on stat_events
   for insert with check (user_id = auth.uid());
+
+drop policy if exists "books_select_own" on books;
+create policy "books_select_own" on books
+  for select using (user_id = auth.uid());
+drop policy if exists "books_insert_own" on books;
+create policy "books_insert_own" on books
+  for insert with check (user_id = auth.uid());
+drop policy if exists "books_update_own" on books;
+create policy "books_update_own" on books
+  for update using (user_id = auth.uid()) with check (user_id = auth.uid());
+drop policy if exists "books_delete_own" on books;
+create policy "books_delete_own" on books
+  for delete using (user_id = auth.uid());

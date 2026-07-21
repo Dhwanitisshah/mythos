@@ -84,6 +84,12 @@ export default async function KingdomsPage() {
           >
             Character
           </Link>
+          <Link
+            href="/library"
+            className="text-sm text-parchment-dim underline decoration-ink-border underline-offset-4 transition-colors hover:text-gold-bright"
+          >
+            Library
+          </Link>
         </div>
       </div>
 

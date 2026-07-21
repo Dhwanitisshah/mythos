@@ -69,6 +69,12 @@ export default async function CharacterPage() {
           >
             Kingdoms
           </Link>
+          <Link
+            href="/library"
+            className="text-sm text-parchment-dim underline decoration-ink-border underline-offset-4 transition-colors hover:text-gold-bright"
+          >
+            Library
+          </Link>
         </div>
       </div>
 
