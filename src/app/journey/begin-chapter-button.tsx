@@ -19,15 +19,16 @@ export function BeginChapterButton() {
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="rise-in flex flex-col items-center gap-3 py-8 text-center">
+      <p className="text-sm text-parchment-dim">The page is blank. What will you write today?</p>
       <button
         onClick={handleClick}
         disabled={isPending}
-        className="rounded bg-black px-4 py-2 text-white disabled:opacity-50 dark:bg-white dark:text-black"
+        className="rounded border border-gold/60 bg-ink-raised px-6 py-2.5 font-display text-sm tracking-wide text-gold-bright transition-colors hover:border-gold hover:bg-ink-border disabled:opacity-50"
       >
         {isPending ? "Writing your chapter..." : "Begin today's chapter"}
       </button>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-crimson-bright">{error}</p>}
     </div>
   );
 }

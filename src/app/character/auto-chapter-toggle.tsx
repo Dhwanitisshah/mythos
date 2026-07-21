@@ -25,9 +25,9 @@ export function AutoChapterToggle({ initialValue }: { initialValue: boolean }) {
   return (
     <div className="flex flex-col gap-1">
       <label className="flex items-center justify-between gap-4 text-sm">
-        <span>
+        <span className="text-parchment">
           Auto-write my chapters
-          <span className="block text-xs text-gray-500">
+          <span className="block text-xs text-parchment-faint">
             Each morning, write today&apos;s chapter for me if I haven&apos;t yet.
           </span>
         </span>
@@ -36,10 +36,10 @@ export function AutoChapterToggle({ initialValue }: { initialValue: boolean }) {
           checked={enabled}
           disabled={isPending}
           onChange={handleToggle}
-          className="h-4 w-4"
+          className="h-4 w-4 accent-[var(--color-gold)]"
         />
       </label>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-crimson-bright">{error}</p>}
     </div>
   );
 }

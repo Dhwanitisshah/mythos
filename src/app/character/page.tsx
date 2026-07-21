@@ -51,33 +51,41 @@ export default async function CharacterPage() {
     .limit(10);
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-8 p-8">
+    <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-8 p-6 sm:p-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Character</h1>
+        <h1 className="font-display text-2xl font-semibold tracking-wide text-parchment sm:text-3xl">
+          Character
+        </h1>
         <div className="flex items-center gap-4">
-          <Link href="/journey" className="text-sm underline">
+          <Link
+            href="/journey"
+            className="text-sm text-parchment-dim underline decoration-ink-border underline-offset-4 transition-colors hover:text-gold-bright"
+          >
             Journey
           </Link>
-          <Link href="/kingdoms" className="text-sm underline">
+          <Link
+            href="/kingdoms"
+            className="text-sm text-parchment-dim underline decoration-ink-border underline-offset-4 transition-colors hover:text-gold-bright"
+          >
             Kingdoms
           </Link>
         </div>
       </div>
 
-      <section className="rounded border border-gray-300 p-4 dark:border-gray-700">
+      <section className="rounded-lg border border-ink-border bg-ink-raised/50 p-4">
         <AutoChapterToggle initialValue={profile.auto_chapter ?? true} />
       </section>
 
-      <section className="flex flex-col gap-4">
+      <section className="flex flex-col gap-5 rounded-lg border border-ink-border bg-ink-raised/50 p-5">
         {STAT_NAMES.map((stat) => (
-          <div key={stat} className="flex flex-col gap-1">
+          <div key={stat} className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between text-sm">
-              <span className="capitalize">{stat}</span>
-              <span className="text-gray-500">{stats[stat]}</span>
+              <span className="font-display capitalize tracking-wide text-parchment">{stat}</span>
+              <span className="text-parchment-dim">{stats[stat]}</span>
             </div>
-            <div className="h-2 w-full rounded bg-gray-200 dark:bg-gray-800">
+            <div className="h-2 w-full overflow-hidden rounded-full bg-ink">
               <div
-                className="h-2 rounded bg-black dark:bg-white"
+                className="stat-bar-fill h-2 rounded-full bg-gradient-to-r from-gold to-gold-bright"
                 style={{ width: `${Math.min(100, Math.max(0, stats[stat]))}%` }}
               />
             </div>
@@ -85,25 +93,27 @@ export default async function CharacterPage() {
         ))}
       </section>
 
-      <section className="flex flex-col gap-2">
-        <h2 className="text-lg font-medium">Recent history</h2>
+      <section className="flex flex-col gap-3">
+        <h2 className="font-display text-lg font-medium tracking-wide text-parchment">
+          Chronicle
+        </h2>
         {!events || events.length === 0 ? (
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-sm text-parchment-dim">
             No stat changes yet. They&apos;ll show up here after you reflect on a chapter.
           </p>
         ) : (
-          <ul className="flex flex-col gap-2">
+          <ul className="flex flex-col divide-y divide-ink-border rounded-lg border border-ink-border bg-ink-raised/30">
             {events.map((event, index) => (
-              <li
-                key={index}
-                className="flex flex-col gap-0.5 rounded border border-gray-300 p-3 text-sm dark:border-gray-700"
-              >
+              <li key={index} className="flex flex-col gap-0.5 px-4 py-3 text-sm">
                 <span>
-                  <span className="capitalize">{event.stat}</span>{" "}
-                  {event.delta > 0 ? "+" : ""}
-                  {event.delta} — {event.reason}
+                  <span className="font-display capitalize text-parchment">{event.stat}</span>{" "}
+                  <span className={event.delta > 0 ? "text-gold-bright" : "text-crimson-bright"}>
+                    {event.delta > 0 ? "+" : ""}
+                    {event.delta}
+                  </span>{" "}
+                  <span className="text-parchment-dim">— {event.reason}</span>
                 </span>
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-parchment-faint">
                   {new Date(event.created_at).toLocaleDateString()}
                 </span>
               </li>

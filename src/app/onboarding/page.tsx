@@ -24,9 +24,14 @@ export default async function OnboardingPage() {
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-8 p-8">
-      <div className="w-full max-w-lg">
-        <h1 className="mb-2 text-2xl font-semibold">Begin your story</h1>
-        <p className="mb-8 text-sm text-gray-600 dark:text-gray-400">
+      <div className="rise-in w-full max-w-lg">
+        <p className="mb-2 text-xs uppercase tracking-[0.35em] text-parchment-faint">
+          Before the first page
+        </p>
+        <h1 className="mb-2 font-display text-3xl font-semibold text-parchment">
+          Who are you?
+        </h1>
+        <p className="mb-8 text-sm leading-relaxed text-parchment-dim">
           Four questions to know you, and one goal to build the first chapter around.
         </p>
         <OnboardingForm />

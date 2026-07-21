@@ -29,3 +29,14 @@ export const KINGDOM_LIST = KINGDOM_KEYS.map((key) => ({
 export function isKingdomKey(value: unknown): value is KingdomKey {
   return typeof value === "string" && (KINGDOM_KEYS as readonly string[]).includes(value);
 }
+
+// Per-kingdom accent color, as a CSS var reference defined in globals.css.
+// Presentation-only — has no bearing on chapter generation or stats.
+export const KINGDOM_ACCENT: Record<KingdomKey, string> = {
+  fitness: "var(--color-kingdom-fitness)",
+  learning: "var(--color-kingdom-learning)",
+  relationships: "var(--color-kingdom-relationships)",
+  career: "var(--color-kingdom-career)",
+  money: "var(--color-kingdom-money)",
+  mind: "var(--color-kingdom-mind)",
+};

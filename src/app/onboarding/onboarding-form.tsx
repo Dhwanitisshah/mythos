@@ -5,7 +5,7 @@ import { completeOnboarding } from "./actions";
 import { KINGDOM_LIST } from "@/lib/kingdoms";
 
 const inputClass =
-  "rounded border border-gray-300 px-3 py-2 dark:border-gray-700 dark:bg-transparent";
+  "rounded border border-ink-border bg-ink-raised px-3 py-2 text-parchment placeholder:text-parchment-faint focus:border-gold";
 
 export function OnboardingForm() {
   const [dream, setDream] = useState("");
@@ -52,13 +52,13 @@ export function OnboardingForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-      <fieldset className="flex flex-col gap-4">
-        <legend className="mb-2 text-sm font-medium uppercase tracking-wide text-gray-500">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-8">
+      <fieldset className="flex flex-col gap-5">
+        <legend className="mb-1 font-display text-sm uppercase tracking-[0.25em] text-gold">
           Who you are
         </legend>
 
-        <label className="flex flex-col gap-1 text-sm">
+        <label className="flex flex-col gap-1.5 text-sm text-parchment-dim">
           What is your biggest dream?
           <input
             className={inputClass}
@@ -68,7 +68,7 @@ export function OnboardingForm() {
           />
         </label>
 
-        <label className="flex flex-col gap-1 text-sm">
+        <label className="flex flex-col gap-1.5 text-sm text-parchment-dim">
           What is your biggest fear?
           <input
             className={inputClass}
@@ -78,7 +78,7 @@ export function OnboardingForm() {
           />
         </label>
 
-        <label className="flex flex-col gap-1 text-sm">
+        <label className="flex flex-col gap-1.5 text-sm text-parchment-dim">
           What is your greatest strength?
           <input
             className={inputClass}
@@ -88,7 +88,7 @@ export function OnboardingForm() {
           />
         </label>
 
-        <label className="flex flex-col gap-1 text-sm">
+        <label className="flex flex-col gap-1.5 text-sm text-parchment-dim">
           Name a core value you hold.
           <input
             className={inputClass}
@@ -99,12 +99,12 @@ export function OnboardingForm() {
         </label>
       </fieldset>
 
-      <fieldset className="flex flex-col gap-4">
-        <legend className="mb-2 text-sm font-medium uppercase tracking-wide text-gray-500">
+      <fieldset className="flex flex-col gap-5 border-t border-ink-border pt-6">
+        <legend className="mb-1 font-display text-sm uppercase tracking-[0.25em] text-gold">
           Your first goal
         </legend>
 
-        <label className="flex flex-col gap-1 text-sm">
+        <label className="flex flex-col gap-1.5 text-sm text-parchment-dim">
           What do you want to achieve?
           <input
             className={inputClass}
@@ -115,7 +115,7 @@ export function OnboardingForm() {
           />
         </label>
 
-        <label className="flex flex-col gap-1 text-sm">
+        <label className="flex flex-col gap-1.5 text-sm text-parchment-dim">
           Kingdom
           <select
             className={inputClass}
@@ -131,12 +131,12 @@ export function OnboardingForm() {
         </label>
       </fieldset>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-crimson-bright">{error}</p>}
 
       <button
         type="submit"
         disabled={isPending}
-        className="rounded bg-black px-4 py-2 text-white disabled:opacity-50 dark:bg-white dark:text-black"
+        className="rounded border border-gold/60 bg-ink-raised px-4 py-2.5 font-display text-sm tracking-wide text-gold-bright transition-colors hover:border-gold hover:bg-ink-border disabled:opacity-50"
       >
         {isPending ? "Beginning..." : "Begin your story"}
       </button>

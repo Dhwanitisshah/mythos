@@ -24,19 +24,19 @@ export function GoalStatusButtons({ goalId }: { goalId: string }) {
         <button
           onClick={() => handleClick("done")}
           disabled={isPending}
-          className="rounded border border-gray-300 px-3 py-1 text-xs disabled:opacity-50 dark:border-gray-700"
+          className="rounded border border-ink-border px-3 py-1 text-xs text-parchment-dim transition-colors hover:border-gold/60 hover:text-gold-bright disabled:opacity-50"
         >
           Mark done
         </button>
         <button
           onClick={() => handleClick("dropped")}
           disabled={isPending}
-          className="rounded border border-gray-300 px-3 py-1 text-xs disabled:opacity-50 dark:border-gray-700"
+          className="rounded border border-ink-border px-3 py-1 text-xs text-parchment-dim transition-colors hover:border-crimson/60 hover:text-crimson-bright disabled:opacity-50"
         >
           Drop
         </button>
       </div>
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && <p className="text-xs text-crimson-bright">{error}</p>}
     </div>
   );
 }

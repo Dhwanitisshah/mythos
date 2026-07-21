@@ -1,26 +1,167 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Base ink & parchment */
+  --color-ink: #0f0e0c;
+  --color-ink-raised: #17140f;
+  --color-ink-border: #332c22;
+  --color-parchment: #e9dfc9;
+  --color-parchment-dim: #a89a7d;
+  --color-parchment-faint: #6f6650;
+
+  /* Accents */
+  --color-gold: #c9a24b;
+  --color-gold-bright: #e6c874;
+  --color-crimson: #8f2d2d;
+  --color-crimson-bright: #c24444;
+
+  /* Kingdom accents */
+  --color-kingdom-fitness: #6f8a9c;
+  --color-kingdom-learning: #5b4e9c;
+  --color-kingdom-relationships: #b06a76;
+  --color-kingdom-career: #a97a4b;
+  --color-kingdom-money: #8fa35e;
+  --color-kingdom-mind: #9d8bb0;
+
+  --background: var(--color-ink);
+  --foreground: var(--color-parchment);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-ink: var(--color-ink);
+  --color-ink-raised: var(--color-ink-raised);
+  --color-ink-border: var(--color-ink-border);
+  --color-parchment: var(--color-parchment);
+  --color-parchment-dim: var(--color-parchment-dim);
+  --color-parchment-faint: var(--color-parchment-faint);
+  --color-gold: var(--color-gold);
+  --color-gold-bright: var(--color-gold-bright);
+  --color-crimson: var(--color-crimson);
+  --color-crimson-bright: var(--color-crimson-bright);
+  --color-kingdom-fitness: var(--color-kingdom-fitness);
+  --color-kingdom-learning: var(--color-kingdom-learning);
+  --color-kingdom-relationships: var(--color-kingdom-relationships);
+  --color-kingdom-career: var(--color-kingdom-career);
+  --color-kingdom-money: var(--color-kingdom-money);
+  --color-kingdom-mind: var(--color-kingdom-mind);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body), Arial, Helvetica, sans-serif;
+  position: relative;
+}
+
+/* Cheap, static grain + vignette so the ink base reads as stone/parchment
+   rather than a flat rectangle. Fixed so it doesn't repaint on scroll. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  background-size: 180px 180px;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(
+    ellipse at 50% 0%,
+    transparent 0%,
+    transparent 45%,
+    rgba(0, 0, 0, 0.55) 100%
+  );
+}
+
+#__next,
+main {
+  position: relative;
+  z-index: 1;
+}
+
+.font-display {
+  font-family: var(--font-display), serif;
+}
+
+/* Drop cap for the opening paragraph of a chapter */
+.drop-cap::first-letter {
+  font-family: var(--font-display), serif;
+  float: left;
+  font-size: 3.4em;
+  line-height: 0.85;
+  padding-right: 0.08em;
+  padding-top: 0.03em;
+  color: var(--color-gold);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .rise-in {
+    animation: rise-in 0.6s ease-out both;
+  }
+
+  .kingdom-card {
+    transition:
+      transform 0.2s ease-out,
+      border-color 0.2s ease-out,
+      box-shadow 0.2s ease-out;
+  }
+
+  .kingdom-card:hover {
+    transform: translateY(-2px);
+  }
+
+  .stat-bar-fill {
+    /* No 100% keyframe: per spec, the animation interpolates toward the
+       element's own inline `width` (the actual stat value) at 100%, so the
+       server-rendered width just grows in on mount without any JS. */
+    animation: stat-grow 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  @keyframes stat-grow {
+    from {
+      width: 0%;
+    }
+  }
+
+  .quest-pulse {
+    animation: quest-pulse 0.5s ease-out;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes quest-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(201, 162, 75, 0.55);
+  }
+  100% {
+    box-shadow: 0 0 0 8px rgba(201, 162, 75, 0);
+  }
+}
+
+/* Visible, on-brand focus ring instead of the browser default */
+:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 2px;
 }

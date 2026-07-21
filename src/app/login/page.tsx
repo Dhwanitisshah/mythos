@@ -8,6 +8,9 @@ import { resolveNextPath } from "@/utils/supabase/resolve-next-path";
 
 const MIN_PASSWORD_LENGTH = 8;
 
+const inputClass =
+  "rounded border border-ink-border bg-ink-raised px-3 py-2 text-parchment placeholder:text-parchment-faint focus:border-gold";
+
 type AuthMode = "magic-link" | "password";
 type PasswordMode = "sign-in" | "sign-up";
 
@@ -115,17 +118,24 @@ function LoginForm() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-6 p-8">
-      <h1 className="text-2xl font-semibold">Log in to Mythos</h1>
+    <main className="flex min-h-screen flex-col items-center justify-center gap-8 p-8">
+      <div className="rise-in flex flex-col items-center gap-1 text-center">
+        <p className="text-xs uppercase tracking-[0.35em] text-parchment-faint">
+          Mythos
+        </p>
+        <h1 className="font-display text-3xl font-semibold text-parchment">
+          Return to your story
+        </h1>
+      </div>
 
-      <div className="flex w-full max-w-sm flex-col gap-4">
+      <div className="rise-in flex w-full max-w-sm flex-col gap-4">
         {errorMessage && (
-          <p className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-600">
+          <p className="rounded border border-crimson/60 bg-crimson/10 px-3 py-2 text-sm text-crimson-bright">
             {errorMessage}
           </p>
         )}
 
-        <div className="flex justify-center gap-2 text-sm">
+        <div className="flex justify-center gap-3 text-sm">
           <button
             type="button"
             onClick={() => {
@@ -134,12 +144,14 @@ function LoginForm() {
               setErrorMessage("");
             }}
             className={
-              authMode === "password" ? "font-semibold underline" : "text-gray-500"
+              authMode === "password"
+                ? "font-display text-gold-bright"
+                : "text-parchment-faint transition-colors hover:text-parchment-dim"
             }
           >
             Password
           </button>
-          <span className="text-gray-300">|</span>
+          <span className="text-ink-border">|</span>
           <button
             type="button"
             onClick={() => {
@@ -148,7 +160,9 @@ function LoginForm() {
               setErrorMessage("");
             }}
             className={
-              authMode === "magic-link" ? "font-semibold underline" : "text-gray-500"
+              authMode === "magic-link"
+                ? "font-display text-gold-bright"
+                : "text-parchment-faint transition-colors hover:text-parchment-dim"
             }
           >
             Magic link
@@ -157,8 +171,9 @@ function LoginForm() {
 
         {authMode === "magic-link" ? (
           status === "sent" ? (
-            <p className="text-center text-sm text-gray-600">
-              Check your inbox at <strong>{email}</strong> for a magic link.
+            <p className="text-center text-sm text-parchment-dim">
+              Check your inbox at <strong className="text-parchment">{email}</strong> for a
+              magic link.
             </p>
           ) : (
             <form
@@ -171,21 +186,21 @@ function LoginForm() {
                 placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="rounded border border-gray-300 px-3 py-2"
+                className={inputClass}
               />
               <button
                 type="submit"
                 disabled={status === "sending"}
-                className="rounded bg-black px-3 py-2 text-white disabled:opacity-50"
+                className="rounded border border-gold/60 bg-ink-raised px-3 py-2 font-display text-sm tracking-wide text-gold-bright transition-colors hover:border-gold hover:bg-ink-border disabled:opacity-50"
               >
                 {status === "sending" ? "Sending link..." : "Send magic link"}
               </button>
             </form>
           )
         ) : status === "confirm-email" ? (
-          <p className="text-center text-sm text-gray-600">
-            Check your inbox at <strong>{email}</strong> to confirm your account
-            before signing in.
+          <p className="text-center text-sm text-parchment-dim">
+            Check your inbox at <strong className="text-parchment">{email}</strong> to confirm
+            your account before signing in.
           </p>
         ) : (
           <form
@@ -198,7 +213,7 @@ function LoginForm() {
               placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="rounded border border-gray-300 px-3 py-2"
+              className={inputClass}
             />
             <input
               type="password"
@@ -210,12 +225,12 @@ function LoginForm() {
               }
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="rounded border border-gray-300 px-3 py-2"
+              className={inputClass}
             />
             <button
               type="submit"
               disabled={status === "sending"}
-              className="rounded bg-black px-3 py-2 text-white disabled:opacity-50"
+              className="rounded border border-gold/60 bg-ink-raised px-3 py-2 font-display text-sm tracking-wide text-gold-bright transition-colors hover:border-gold hover:bg-ink-border disabled:opacity-50"
             >
               {status === "sending"
                 ? "Please wait..."
@@ -229,7 +244,7 @@ function LoginForm() {
                 setPasswordMode((m) => (m === "sign-in" ? "sign-up" : "sign-in"));
                 setErrorMessage("");
               }}
-              className="text-center text-sm text-gray-500 underline"
+              className="text-center text-sm text-parchment-faint underline decoration-ink-border underline-offset-4 transition-colors hover:text-parchment-dim"
             >
               {passwordMode === "sign-in"
                 ? "Need an account? Create one"

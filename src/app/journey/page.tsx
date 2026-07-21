@@ -59,15 +59,23 @@ export default async function JourneyPage() {
     : null;
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-8 p-8">
+    <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-8 p-6 sm:p-8">
       {!profile.timezone && <TimezoneSync />}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Your Journey</h1>
+        <h1 className="font-display text-2xl font-semibold tracking-wide text-parchment sm:text-3xl">
+          Your Journey
+        </h1>
         <div className="flex items-center gap-4">
-          <Link href="/kingdoms" className="text-sm underline">
+          <Link
+            href="/kingdoms"
+            className="text-sm text-parchment-dim underline decoration-ink-border underline-offset-4 transition-colors hover:text-gold-bright"
+          >
             Kingdoms
           </Link>
-          <Link href="/character" className="text-sm underline">
+          <Link
+            href="/character"
+            className="text-sm text-parchment-dim underline decoration-ink-border underline-offset-4 transition-colors hover:text-gold-bright"
+          >
             Character
           </Link>
           <SignOutButton />
@@ -75,9 +83,9 @@ export default async function JourneyPage() {
       </div>
 
       {goals.length === 0 && !latestChapter ? (
-        <p className="text-sm text-gray-600 dark:text-gray-400">
+        <p className="text-sm text-parchment-dim">
           You don&apos;t have any active goals yet.{" "}
-          <Link href="/kingdoms" className="underline">
+          <Link href="/kingdoms" className="text-gold-bright underline decoration-ink-border underline-offset-4">
             Set one in Kingdoms
           </Link>{" "}
           to begin your first chapter.
@@ -85,14 +93,14 @@ export default async function JourneyPage() {
       ) : (
         <>
           {goals.length > 0 && (
-            <section className="rounded border border-gray-300 p-4 dark:border-gray-700">
-              <p className="mb-2 text-xs uppercase tracking-wide text-gray-500">
+            <section className="rounded-lg border border-ink-border bg-ink-raised/50 p-4">
+              <p className="mb-2 text-[11px] uppercase tracking-[0.2em] text-parchment-faint">
                 Kingdoms in play
               </p>
               <ul className="flex flex-col gap-1">
                 {goals.map((g) => (
-                  <li key={g.id} className="text-sm">
-                    <span className="text-gray-500">{KINGDOMS[g.kingdom]}:</span>{" "}
+                  <li key={g.id} className="text-sm text-parchment">
+                    <span className="text-parchment-faint">{KINGDOMS[g.kingdom]}:</span>{" "}
                     {g.title}
                   </li>
                 ))}
@@ -101,9 +109,9 @@ export default async function JourneyPage() {
           )}
 
           {goals.length === 0 ? (
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+            <p className="text-sm text-parchment-dim">
               You don&apos;t have any active goals right now.{" "}
-              <Link href="/kingdoms" className="underline">
+              <Link href="/kingdoms" className="text-gold-bright underline decoration-ink-border underline-offset-4">
                 Add one in Kingdoms
               </Link>{" "}
               to begin tomorrow&apos;s chapter.
@@ -112,32 +120,45 @@ export default async function JourneyPage() {
             <BeginChapterButton />
           ) : (
             latestChapter && (
-              <article className="flex flex-col gap-4">
-                <div className="flex flex-col gap-1">
-                  <h2 className="text-xl font-semibold">
-                    Chapter {latestChapter.chapter_number}: {latestChapter.title}
+              <article className="rise-in mx-auto flex w-full max-w-[65ch] flex-col gap-6">
+                <div className="flex flex-col gap-2 border-b border-ink-border pb-4">
+                  <p className="text-[11px] uppercase tracking-[0.3em] text-parchment-faint">
+                    Chapter {latestChapter.chapter_number}
+                  </p>
+                  <h2 className="font-display text-2xl font-semibold leading-snug text-parchment sm:text-3xl">
+                    {latestChapter.title}
                   </h2>
                   {latestChapter.generated_by === "auto" && (
-                    <p className="text-xs text-gray-500">Written for you this morning</p>
+                    <p className="text-xs italic text-parchment-faint">
+                      Written for you this morning
+                    </p>
                   )}
                 </div>
-                <p className="whitespace-pre-wrap leading-relaxed text-gray-800 dark:text-gray-200">
+                <p className="drop-cap whitespace-pre-wrap text-[15px] leading-[1.9] text-parchment/90">
                   {latestChapter.narrative}
                 </p>
-                <QuestChecklist
-                  chapterId={latestChapter.id}
-                  quests={latestChapter.quests as Quest[]}
-                />
+                <div className="border-t border-ink-border pt-6">
+                  <p className="mb-3 font-display text-sm uppercase tracking-[0.25em] text-gold">
+                    Quests
+                  </p>
+                  <QuestChecklist
+                    chapterId={latestChapter.id}
+                    quests={latestChapter.quests as Quest[]}
+                  />
+                </div>
 
                 {!latestChapter.reflected_at ? (
                   <ReflectionForm chapterId={latestChapter.id} />
                 ) : (
-                  <div className="flex flex-col gap-1 rounded border border-gray-300 p-4 dark:border-gray-700">
-                    <p className="whitespace-pre-wrap text-sm text-gray-800 dark:text-gray-200">
+                  <div className="flex flex-col gap-2 rounded-lg border border-ink-border bg-ink-raised/50 p-5">
+                    <p className="text-[11px] uppercase tracking-[0.2em] text-parchment-faint">
+                      Your reflection
+                    </p>
+                    <p className="whitespace-pre-wrap font-display text-[15px] italic leading-relaxed text-parchment/90">
                       {latestChapter.reflection}
                     </p>
                     {reflectionSummary && (
-                      <p className="text-xs italic text-gray-500">{reflectionSummary}</p>
+                      <p className="text-xs text-parchment-faint">{reflectionSummary}</p>
                     )}
                   </div>
                 )}
