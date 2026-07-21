@@ -28,17 +28,20 @@ function lastMonthWindow(): { startDate: string; endDate: string } {
 export function ComposeButtons() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [error, setError] = useState("");
+  const [notice, setNotice] = useState<{ kind: "info" | "error"; message: string } | null>(null);
 
   function handleCompose(window: { startDate: string; endDate: string }) {
-    setError("");
+    setNotice(null);
     startTransition(async () => {
-      try {
-        const { book } = await composeBook(window.startDate, window.endDate);
-        router.push(`/library/${book.id}`);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong.");
+      const result = await composeBook(window.startDate, window.endDate);
+      if (result.ok) {
+        router.push(`/library/${result.book.id}`);
+        return;
       }
+      setNotice({
+        kind: result.reason === "insufficient-record" ? "info" : "error",
+        message: result.message,
+      });
     });
   }
 
@@ -60,7 +63,17 @@ export function ComposeButtons() {
           Compose last month
         </button>
       </div>
-      {error && <p className="text-xs text-crimson-bright">{error}</p>}
+      {notice && (
+        <p
+          className={
+            notice.kind === "info"
+              ? "text-xs text-parchment-dim"
+              : "text-xs text-crimson-bright"
+          }
+        >
+          {notice.message}
+        </p>
+      )}
     </div>
   );
 }

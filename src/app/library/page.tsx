@@ -3,6 +3,11 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { ComposeButtons } from "./compose-buttons";
 
+// composeBook synthesizes a whole period's chapters in one Gemini call,
+// which can exceed the platform default of 10s — same rationale as the
+// cron route's maxDuration.
+export const maxDuration = 60;
+
 function formatDate(s: string): string {
   return new Date(`${s}T00:00:00Z`).toLocaleDateString("en-US", {
     month: "short",

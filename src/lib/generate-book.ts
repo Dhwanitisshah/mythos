@@ -105,8 +105,7 @@ export async function generateBookForPeriod(
     if (chapterRows.length < MIN_CHAPTERS) {
       return {
         status: "insufficient",
-        message:
-          "Not enough of the record yet — this period has too few chapters to compose a Book.",
+        message: `Not enough of the record yet. Compose a Book once you have at least ${MIN_CHAPTERS} chapters in the period.`,
       };
     }
 

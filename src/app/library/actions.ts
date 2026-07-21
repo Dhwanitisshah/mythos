@@ -5,10 +5,14 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { generateBookForPeriod, type BookRecord } from "@/lib/generate-book";
 
+export type ComposeBookResult =
+  | { ok: true; book: BookRecord }
+  | { ok: false; reason: "insufficient-record" | "generation-failed"; message: string };
+
 export async function composeBook(
   startDate: string,
   endDate: string,
-): Promise<{ book: BookRecord }> {
+): Promise<ComposeBookResult> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -23,12 +27,12 @@ export async function composeBook(
   switch (result.status) {
     case "created":
       revalidatePath("/library");
-      return { book: result.book };
+      return { ok: true, book: result.book };
     case "existing":
-      return { book: result.book };
+      return { ok: true, book: result.book };
     case "insufficient":
-      throw new Error(result.message);
+      return { ok: false, reason: "insufficient-record", message: result.message };
     case "error":
-      throw new Error(result.message);
+      return { ok: false, reason: "generation-failed", message: result.message };
   }
 }

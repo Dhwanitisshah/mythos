@@ -5,15 +5,17 @@ import { beginTodaysChapter } from "./actions";
 
 export function BeginChapterButton() {
   const [isPending, startTransition] = useTransition();
-  const [error, setError] = useState("");
+  const [notice, setNotice] = useState<{ kind: "info" | "error"; message: string } | null>(null);
 
   function handleClick() {
-    setError("");
+    setNotice(null);
     startTransition(async () => {
-      try {
-        await beginTodaysChapter();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong.");
+      const result = await beginTodaysChapter();
+      if (!result.ok) {
+        setNotice({
+          kind: result.reason === "no-active-goals" ? "info" : "error",
+          message: result.message,
+        });
       }
     });
   }
@@ -28,7 +30,15 @@ export function BeginChapterButton() {
       >
         {isPending ? "Writing your chapter..." : "Begin today's chapter"}
       </button>
-      {error && <p className="text-sm text-crimson-bright">{error}</p>}
+      {notice && (
+        <p
+          className={
+            notice.kind === "info" ? "text-sm text-parchment-dim" : "text-sm text-crimson-bright"
+          }
+        >
+          {notice.message}
+        </p>
+      )}
     </div>
   );
 }

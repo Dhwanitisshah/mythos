@@ -10,6 +10,11 @@ import { QuestChecklist } from "./quest-checklist";
 import { ReflectionForm } from "./reflection-form";
 import { TimezoneSync } from "./timezone-sync";
 
+// This page's Server Actions (beginTodaysChapter, submitReflection) each make
+// a single Gemini call that can exceed the platform default of 10s — same
+// rationale as the cron route's maxDuration.
+export const maxDuration = 60;
+
 export default async function JourneyPage() {
   const supabase = await createClient();
   const {

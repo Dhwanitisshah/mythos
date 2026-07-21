@@ -5,23 +5,29 @@ import { submitReflection } from "./actions";
 
 export function ReflectionForm({ chapterId }: { chapterId: string }) {
   const [text, setText] = useState("");
-  const [error, setError] = useState("");
+  const [notice, setNotice] = useState<{ kind: "info" | "error"; message: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError("");
+    setNotice(null);
 
     if (!text.trim()) {
-      setError("Write a few words about what happened.");
+      setNotice({ kind: "error", message: "Write a few words about what happened." });
       return;
     }
 
     startTransition(async () => {
       try {
-        await submitReflection(chapterId, text);
+        const result = await submitReflection(chapterId, text);
+        if (!result.ok) {
+          setNotice({ kind: "info", message: result.message });
+        }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong.");
+        setNotice({
+          kind: "error",
+          message: err instanceof Error ? err.message : "Something went wrong.",
+        });
       }
     });
   }
@@ -42,7 +48,15 @@ export function ReflectionForm({ chapterId }: { chapterId: string }) {
           onChange={(e) => setText(e.target.value)}
         />
       </label>
-      {error && <p className="text-sm text-crimson-bright">{error}</p>}
+      {notice && (
+        <p
+          className={
+            notice.kind === "info" ? "text-sm text-parchment-dim" : "text-sm text-crimson-bright"
+          }
+        >
+          {notice.message}
+        </p>
+      )}
       <button
         type="submit"
         disabled={isPending}

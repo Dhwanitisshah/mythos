@@ -6,24 +6,31 @@ import type { KingdomKey } from "@/lib/kingdoms";
 
 export function AddGoalForm({ kingdom, disabled }: { kingdom: KingdomKey; disabled: boolean }) {
   const [title, setTitle] = useState("");
-  const [error, setError] = useState("");
+  const [notice, setNotice] = useState<{ kind: "info" | "error"; message: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError("");
+    setNotice(null);
 
     if (!title.trim()) {
-      setError("Give the goal a title.");
+      setNotice({ kind: "error", message: "Give the goal a title." });
       return;
     }
 
     startTransition(async () => {
       try {
-        await addGoal(kingdom, title);
-        setTitle("");
+        const result = await addGoal(kingdom, title);
+        if (result.ok) {
+          setTitle("");
+        } else {
+          setNotice({ kind: "info", message: result.message });
+        }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong.");
+        setNotice({
+          kind: "error",
+          message: err instanceof Error ? err.message : "Something went wrong.",
+        });
       }
     });
   }
@@ -44,7 +51,15 @@ export function AddGoalForm({ kingdom, disabled }: { kingdom: KingdomKey; disabl
         onChange={(e) => setTitle(e.target.value)}
         placeholder="What do you want to achieve?"
       />
-      {error && <p className="text-xs text-crimson-bright">{error}</p>}
+      {notice && (
+        <p
+          className={
+            notice.kind === "info" ? "text-xs text-parchment-dim" : "text-xs text-crimson-bright"
+          }
+        >
+          {notice.message}
+        </p>
+      )}
       <button
         type="submit"
         disabled={isPending}

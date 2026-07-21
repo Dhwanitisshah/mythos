@@ -7,7 +7,11 @@ import { isKingdomKey } from "@/lib/kingdoms";
 
 const ACTIVE_GOAL_CAP = 4;
 
-export async function addGoal(kingdom: string, title: string) {
+export type AddGoalResult =
+  | { ok: true }
+  | { ok: false; reason: "goal-cap" | "duplicate-kingdom"; message: string };
+
+export async function addGoal(kingdom: string, title: string): Promise<AddGoalResult> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -37,7 +41,11 @@ export async function addGoal(kingdom: string, title: string) {
   }
 
   if ((count ?? 0) >= ACTIVE_GOAL_CAP) {
-    throw new Error(`You can have at most ${ACTIVE_GOAL_CAP} active goals at once.`);
+    return {
+      ok: false,
+      reason: "goal-cap",
+      message: `You can have at most ${ACTIVE_GOAL_CAP} active goals at once.`,
+    };
   }
 
   const { data: existing, error: existingError } = await supabase
@@ -53,7 +61,11 @@ export async function addGoal(kingdom: string, title: string) {
   }
 
   if (existing) {
-    throw new Error("This kingdom already has an active goal");
+    return {
+      ok: false,
+      reason: "duplicate-kingdom",
+      message: "This kingdom already has an active goal.",
+    };
   }
 
   const { error: insertError } = await supabase.from("goals").insert({
@@ -69,6 +81,7 @@ export async function addGoal(kingdom: string, title: string) {
 
   revalidatePath("/kingdoms");
   revalidatePath("/journey");
+  return { ok: true };
 }
 
 export async function setGoalStatus(goalId: string, status: "done" | "dropped") {

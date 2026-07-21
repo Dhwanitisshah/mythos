@@ -77,7 +77,11 @@ async function applyStatChanges(
   }
 }
 
-export async function beginTodaysChapter() {
+export type BeginChapterResult =
+  | { ok: true }
+  | { ok: false; reason: "no-active-goals" | "generation-failed"; message: string };
+
+export async function beginTodaysChapter(): Promise<BeginChapterResult> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -91,18 +95,20 @@ export async function beginTodaysChapter() {
 
   switch (result.status) {
     case "created":
-      break;
     case "skipped-already-exists":
       // The UI only shows this button when there's no chapter for today;
       // treat a race as a no-op rather than an error.
-      break;
+      revalidatePath("/journey");
+      return { ok: true };
     case "skipped-no-goals":
-      throw new Error("You don't have any active goals yet — set one in Kingdoms first.");
+      return {
+        ok: false,
+        reason: "no-active-goals",
+        message: "You don't have any active goals yet — set one in Kingdoms first.",
+      };
     case "error":
-      throw new Error(result.message);
+      return { ok: false, reason: "generation-failed", message: result.message };
   }
-
-  revalidatePath("/journey");
 }
 
 export async function toggleQuest(chapterId: string, questIndex: number) {
@@ -164,7 +170,14 @@ export async function toggleQuest(chapterId: string, questIndex: number) {
   return { statsError };
 }
 
-export async function submitReflection(chapterId: string, text: string) {
+export type SubmitReflectionResult =
+  | { ok: true }
+  | { ok: false; reason: "already-reflected"; message: string };
+
+export async function submitReflection(
+  chapterId: string,
+  text: string,
+): Promise<SubmitReflectionResult> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -191,7 +204,11 @@ export async function submitReflection(chapterId: string, text: string) {
   }
 
   if (existingChapter.reflected_at) {
-    throw new Error("This chapter has already been reflected on");
+    return {
+      ok: false,
+      reason: "already-reflected",
+      message: "This chapter has already been reflected on.",
+    };
   }
 
   const extracted = await extractReflection(trimmed);
@@ -212,6 +229,7 @@ export async function submitReflection(chapterId: string, text: string) {
   }
 
   revalidatePath("/journey");
+  return { ok: true };
 }
 
 export async function setProfileTimezone(timezone: string) {
