@@ -1,5 +1,8 @@
 import Link from "next/link";
 
+// See src/app/page.tsx for why this must be forced dynamic (CSP nonce).
+export const dynamic = "force-dynamic";
+
 export default function NotFound() {
   return (
     <div className="rise-in mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center gap-4 px-6 text-center">

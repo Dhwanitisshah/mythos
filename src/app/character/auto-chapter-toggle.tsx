@@ -13,11 +13,10 @@ export function AutoChapterToggle({ initialValue }: { initialValue: boolean }) {
     setEnabled(next);
     setError("");
     startTransition(async () => {
-      try {
-        await setAutoChapter(next);
-      } catch (err) {
+      const result = await setAutoChapter(next);
+      if (!result.ok) {
         setEnabled(!next);
-        setError(err instanceof Error ? err.message : "Something went wrong.");
+        setError(result.message);
       }
     });
   }

@@ -1,4 +1,4 @@
--- Mythos canonical schema (Phase 1 + Phase 2 + Phase 3 + Phase 4 + Phase 5 + Phase 7)
+-- Mythos canonical schema (Phase 1 + Phase 2 + Phase 3 + Phase 4 + Phase 5 + Phase 7 + Phase 9)
 -- Paste this entire file into the Supabase SQL editor and run it.
 --
 -- Phase 4 (kingdoms) note: the six life domains a goal can belong to are NOT
@@ -16,6 +16,12 @@
 -- Phase 7 (the Book) note: period summaries are derived entirely from
 -- existing chapters/stat_events/goals — no new source-of-truth tables, just
 -- the `books` table below to persist the generated summary itself.
+--
+-- Phase 8 (production readiness) note: no schema delta.
+--
+-- Phase 9 (free production hardening) note: `generation_throttle` backs a
+-- best-effort per-user rate limit on the AI-calling actions — see
+-- src/lib/rate-limit.ts.
 
 create table if not exists profiles (
   id uuid primary key references auth.users (id) on delete cascade,
@@ -85,6 +91,12 @@ create table if not exists books (
   constraint books_user_period_unique unique (user_id, period_start, period_end)
 );
 
+create table if not exists generation_throttle (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  last_chapter_request_at timestamptz,
+  last_book_request_at timestamptz
+);
+
 create index if not exists goals_user_id_idx on goals (user_id);
 create index if not exists goals_kingdom_idx on goals (kingdom);
 create index if not exists chapters_user_id_idx on chapters (user_id);
@@ -100,6 +112,7 @@ alter table chapters enable row level security;
 alter table stats enable row level security;
 alter table stat_events enable row level security;
 alter table books enable row level security;
+alter table generation_throttle enable row level security;
 
 drop policy if exists "profiles_select_own" on profiles;
 create policy "profiles_select_own" on profiles
@@ -172,3 +185,13 @@ create policy "books_update_own" on books
 drop policy if exists "books_delete_own" on books;
 create policy "books_delete_own" on books
   for delete using (user_id = auth.uid());
+
+drop policy if exists "generation_throttle_select_own" on generation_throttle;
+create policy "generation_throttle_select_own" on generation_throttle
+  for select using (user_id = auth.uid());
+drop policy if exists "generation_throttle_insert_own" on generation_throttle;
+create policy "generation_throttle_insert_own" on generation_throttle
+  for insert with check (user_id = auth.uid());
+drop policy if exists "generation_throttle_update_own" on generation_throttle;
+create policy "generation_throttle_update_own" on generation_throttle
+  for update using (user_id = auth.uid()) with check (user_id = auth.uid());

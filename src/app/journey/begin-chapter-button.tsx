@@ -13,7 +13,7 @@ export function BeginChapterButton() {
       const result = await beginTodaysChapter();
       if (!result.ok) {
         setNotice({
-          kind: result.reason === "no-active-goals" ? "info" : "error",
+          kind: result.reason === "no-active-goals" || result.reason === "rate-limited" ? "info" : "error",
           message: result.message,
         });
       }

@@ -12,6 +12,9 @@ import {
   type StatName,
 } from "@/lib/ai";
 import { generateDailyChapter } from "@/lib/generate-daily-chapter";
+import { checkAndClaimThrottle } from "@/lib/rate-limit";
+
+const CHAPTER_THROTTLE_SECONDS = 30;
 
 const STAT_MIN = 0;
 const STAT_MAX = 100;
@@ -79,7 +82,11 @@ async function applyStatChanges(
 
 export type BeginChapterResult =
   | { ok: true }
-  | { ok: false; reason: "no-active-goals" | "generation-failed"; message: string };
+  | {
+      ok: false;
+      reason: "no-active-goals" | "rate-limited" | "generation-failed";
+      message: string;
+    };
 
 export async function beginTodaysChapter(): Promise<BeginChapterResult> {
   const supabase = await createClient();
@@ -89,6 +96,20 @@ export async function beginTodaysChapter(): Promise<BeginChapterResult> {
 
   if (!user) {
     redirect("/login");
+  }
+
+  const throttle = await checkAndClaimThrottle(
+    supabase,
+    user.id,
+    "last_chapter_request_at",
+    CHAPTER_THROTTLE_SECONDS,
+  );
+  if (throttle.limited) {
+    return {
+      ok: false,
+      reason: "rate-limited",
+      message: `You just tried this — wait ${throttle.retryAfterSeconds}s and try again.`,
+    };
   }
 
   const result = await generateDailyChapter(supabase, user.id, "manual");
@@ -111,7 +132,18 @@ export async function beginTodaysChapter(): Promise<BeginChapterResult> {
   }
 }
 
-export async function toggleQuest(chapterId: string, questIndex: number) {
+export type ToggleQuestResult =
+  | { ok: true; statsError: string | null }
+  | {
+      ok: false;
+      reason: "chapter-not-found" | "quest-not-found" | "update-failed";
+      message: string;
+    };
+
+export async function toggleQuest(
+  chapterId: string,
+  questIndex: number,
+): Promise<ToggleQuestResult> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -121,20 +153,37 @@ export async function toggleQuest(chapterId: string, questIndex: number) {
     redirect("/login");
   }
 
+  if (!Number.isInteger(questIndex) || questIndex < 0) {
+    return {
+      ok: false,
+      reason: "quest-not-found",
+      message: "That quest could not be found. Try refreshing the page.",
+    };
+  }
+
   const { data: chapter, error: fetchError } = await supabase
     .from("chapters")
     .select("quests")
     .eq("id", chapterId)
+    .eq("user_id", user.id)
     .single();
 
   if (fetchError || !chapter) {
-    throw new Error("Could not load chapter");
+    return {
+      ok: false,
+      reason: "chapter-not-found",
+      message: "Could not load this chapter. Try refreshing the page.",
+    };
   }
 
   const quests = chapter.quests as Quest[];
   const quest = quests[questIndex];
   if (!quest) {
-    throw new Error("Quest not found");
+    return {
+      ok: false,
+      reason: "quest-not-found",
+      message: "That quest could not be found. Try refreshing the page.",
+    };
   }
 
   const nowDone = !quest.done;
@@ -143,10 +192,15 @@ export async function toggleQuest(chapterId: string, questIndex: number) {
   const { error: updateError } = await supabase
     .from("chapters")
     .update({ quests })
-    .eq("id", chapterId);
+    .eq("id", chapterId)
+    .eq("user_id", user.id);
 
   if (updateError) {
-    throw new Error(`Failed to update quest: ${updateError.message}`);
+    return {
+      ok: false,
+      reason: "update-failed",
+      message: "Could not save that change. Try again.",
+    };
   }
 
   let statsError: string | null = null;
@@ -167,12 +221,18 @@ export async function toggleQuest(chapterId: string, questIndex: number) {
   revalidatePath("/journey");
   revalidatePath("/character");
 
-  return { statsError };
+  return { ok: true, statsError };
 }
 
 export type SubmitReflectionResult =
   | { ok: true }
-  | { ok: false; reason: "already-reflected"; message: string };
+  | {
+      ok: false;
+      reason: "empty" | "too-long" | "chapter-not-found" | "already-reflected" | "generation-failed" | "save-failed";
+      message: string;
+    };
+
+const MAX_REFLECTION_LENGTH = 4000;
 
 export async function submitReflection(
   chapterId: string,
@@ -189,7 +249,14 @@ export async function submitReflection(
 
   const trimmed = text.trim();
   if (!trimmed) {
-    throw new Error("Reflection cannot be empty");
+    return { ok: false, reason: "empty", message: "Write a few words about what happened." };
+  }
+  if (trimmed.length > MAX_REFLECTION_LENGTH) {
+    return {
+      ok: false,
+      reason: "too-long",
+      message: `Keep your reflection under ${MAX_REFLECTION_LENGTH} characters.`,
+    };
   }
 
   const { data: existingChapter, error: existingError } = await supabase
@@ -200,7 +267,11 @@ export async function submitReflection(
     .single();
 
   if (existingError || !existingChapter) {
-    throw new Error("Could not load chapter");
+    return {
+      ok: false,
+      reason: "chapter-not-found",
+      message: "Could not load this chapter. Try refreshing the page.",
+    };
   }
 
   if (existingChapter.reflected_at) {
@@ -211,7 +282,16 @@ export async function submitReflection(
     };
   }
 
-  const extracted = await extractReflection(trimmed);
+  let extracted;
+  try {
+    extracted = await extractReflection(trimmed);
+  } catch {
+    return {
+      ok: false,
+      reason: "generation-failed",
+      message: "Couldn't process your reflection right now. Try again in a moment.",
+    };
+  }
 
   const { error: updateError } = await supabase
     .from("chapters")
@@ -225,14 +305,35 @@ export async function submitReflection(
     .is("reflected_at", null);
 
   if (updateError) {
-    throw new Error(`Failed to save reflection: ${updateError.message}`);
+    return {
+      ok: false,
+      reason: "save-failed",
+      message: "Could not save your reflection. Try again.",
+    };
   }
 
   revalidatePath("/journey");
   return { ok: true };
 }
 
-export async function setProfileTimezone(timezone: string) {
+export type SetProfileTimezoneResult = { ok: true } | { ok: false; message: string };
+
+const MAX_TIMEZONE_LENGTH = 100;
+
+function isValidTimezone(value: string): boolean {
+  if (value.length > MAX_TIMEZONE_LENGTH) return false;
+  try {
+    // Throws a RangeError for anything that isn't a real IANA timezone name.
+    Intl.DateTimeFormat(undefined, { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function setProfileTimezone(
+  timezone: string,
+): Promise<SetProfileTimezoneResult> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -242,23 +343,33 @@ export async function setProfileTimezone(timezone: string) {
     redirect("/login");
   }
 
-  if (!timezone.trim()) {
-    return;
+  const trimmed = timezone.trim();
+  if (!trimmed) {
+    return { ok: true };
+  }
+
+  if (!isValidTimezone(trimmed)) {
+    return { ok: false, message: "That isn't a recognized timezone." };
   }
 
   const { error: updateError } = await supabase
     .from("profiles")
-    .update({ timezone })
+    .update({ timezone: trimmed })
     .eq("id", user.id);
 
   if (updateError) {
-    throw new Error(`Failed to save timezone: ${updateError.message}`);
+    return { ok: false, message: "Could not save timezone." };
   }
 
   revalidatePath("/journey");
+  return { ok: true };
 }
 
-export async function setAutoChapter(autoChapter: boolean) {
+export type SetAutoChapterResult = { ok: true } | { ok: false; message: string };
+
+export async function setAutoChapter(
+  autoChapter: boolean,
+): Promise<SetAutoChapterResult> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -274,8 +385,9 @@ export async function setAutoChapter(autoChapter: boolean) {
     .eq("id", user.id);
 
   if (updateError) {
-    throw new Error(`Failed to save preference: ${updateError.message}`);
+    return { ok: false, message: "Could not save preference. Try again." };
   }
 
   revalidatePath("/character");
+  return { ok: true };
 }

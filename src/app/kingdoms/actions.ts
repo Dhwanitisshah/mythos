@@ -7,9 +7,15 @@ import { isKingdomKey } from "@/lib/kingdoms";
 
 const ACTIVE_GOAL_CAP = 4;
 
+const MAX_GOAL_TITLE_LENGTH = 200;
+
 export type AddGoalResult =
   | { ok: true }
-  | { ok: false; reason: "goal-cap" | "duplicate-kingdom"; message: string };
+  | {
+      ok: false;
+      reason: "empty-title" | "too-long" | "invalid-kingdom" | "goal-cap" | "duplicate-kingdom" | "failed";
+      message: string;
+    };
 
 export async function addGoal(kingdom: string, title: string): Promise<AddGoalResult> {
   const supabase = await createClient();
@@ -23,11 +29,18 @@ export async function addGoal(kingdom: string, title: string): Promise<AddGoalRe
 
   const trimmedTitle = title.trim();
   if (!trimmedTitle) {
-    throw new Error("Goal title cannot be empty");
+    return { ok: false, reason: "empty-title", message: "Give the goal a title." };
+  }
+  if (trimmedTitle.length > MAX_GOAL_TITLE_LENGTH) {
+    return {
+      ok: false,
+      reason: "too-long",
+      message: `Keep the goal title under ${MAX_GOAL_TITLE_LENGTH} characters.`,
+    };
   }
 
   if (!isKingdomKey(kingdom)) {
-    throw new Error("Invalid kingdom");
+    return { ok: false, reason: "invalid-kingdom", message: "That kingdom doesn't exist." };
   }
 
   const { count, error: countError } = await supabase
@@ -37,7 +50,7 @@ export async function addGoal(kingdom: string, title: string): Promise<AddGoalRe
     .eq("status", "active");
 
   if (countError) {
-    throw new Error("Could not check your active goals");
+    return { ok: false, reason: "failed", message: "Could not check your active goals. Try again." };
   }
 
   if ((count ?? 0) >= ACTIVE_GOAL_CAP) {
@@ -57,7 +70,7 @@ export async function addGoal(kingdom: string, title: string): Promise<AddGoalRe
     .maybeSingle();
 
   if (existingError) {
-    throw new Error("Could not check this kingdom");
+    return { ok: false, reason: "failed", message: "Could not check this kingdom. Try again." };
   }
 
   if (existing) {
@@ -76,7 +89,7 @@ export async function addGoal(kingdom: string, title: string): Promise<AddGoalRe
   });
 
   if (insertError) {
-    throw new Error(`Failed to add goal: ${insertError.message}`);
+    return { ok: false, reason: "failed", message: "Could not add that goal. Try again." };
   }
 
   revalidatePath("/kingdoms");
@@ -84,7 +97,21 @@ export async function addGoal(kingdom: string, title: string): Promise<AddGoalRe
   return { ok: true };
 }
 
-export async function setGoalStatus(goalId: string, status: "done" | "dropped") {
+export type SetGoalStatusResult = { ok: true } | { ok: false; message: string };
+
+const GOAL_STATUSES = ["done", "dropped"] as const;
+
+export async function setGoalStatus(
+  goalId: string,
+  status: "done" | "dropped",
+): Promise<SetGoalStatusResult> {
+  // The TS param type doesn't survive the network boundary a Server Action
+  // is called across — a crafted request could send any string here, so
+  // re-check at runtime rather than trusting the compiled-away type.
+  if (!(GOAL_STATUSES as readonly string[]).includes(status)) {
+    return { ok: false, message: "That isn't a valid goal status." };
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -101,9 +128,10 @@ export async function setGoalStatus(goalId: string, status: "done" | "dropped") 
     .eq("user_id", user.id);
 
   if (updateError) {
-    throw new Error(`Failed to update goal: ${updateError.message}`);
+    return { ok: false, message: "Could not update that goal. Try again." };
   }
 
   revalidatePath("/kingdoms");
   revalidatePath("/journey");
+  return { ok: true };
 }

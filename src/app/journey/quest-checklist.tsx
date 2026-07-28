@@ -15,15 +15,21 @@ export function QuestChecklist({
 }) {
   const [isPending, startTransition] = useTransition();
   const [statsError, setStatsError] = useState("");
+  const [notice, setNotice] = useState("");
   const [justCompleted, setJustCompleted] = useState<number | null>(null);
 
   function handleToggle(index: number, done: boolean) {
     setStatsError("");
+    setNotice("");
     if (!done) {
       setJustCompleted(index);
     }
     startTransition(async () => {
       const result = await toggleQuest(chapterId, index);
+      if (!result.ok) {
+        setNotice(result.message);
+        return;
+      }
       if (result.statsError) {
         setStatsError(result.statsError);
       }
@@ -79,6 +85,7 @@ export function QuestChecklist({
           );
         })}
       </ul>
+      {notice && <p className="text-xs text-crimson-bright">{notice}</p>}
       {statsError && (
         <p className="text-xs text-crimson-bright">Quest saved, but stat update failed: {statsError}</p>
       )}

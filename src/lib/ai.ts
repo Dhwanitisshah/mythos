@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { KINGDOMS, type KingdomKey } from "./kingdoms";
+import { serverEnv } from "./env";
 
 // "gemini-flash-latest" is Google's alias that always points at the current
 // recommended free-tier Flash model, so it survives model retirements (pinned
@@ -195,10 +196,7 @@ function stripJsonFences(text: string): string {
 export async function generateChapter(
   input: GenerateChapterInput,
 ): Promise<Chapter> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is not set");
-  }
+  const apiKey = serverEnv.GEMINI_API_KEY;
 
   if (input.goals.length === 0) {
     throw new Error("Chapter generation failed: no active goals were provided");
@@ -310,10 +308,7 @@ Respond with JSON matching the schema:
 }
 
 export async function extractReflection(rawText: string): Promise<ReflectionExtracted> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is not set");
-  }
+  const apiKey = serverEnv.GEMINI_API_KEY;
 
   const ai = new GoogleGenAI({ apiKey });
 
@@ -454,10 +449,7 @@ Respond with JSON matching the provided schema only.`;
 }
 
 export async function generateBook(input: GenerateBookInput): Promise<Book> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is not set");
-  }
+  const apiKey = serverEnv.GEMINI_API_KEY;
 
   if (input.chapters.length === 0) {
     throw new Error("Book generation failed: no chapters were provided");

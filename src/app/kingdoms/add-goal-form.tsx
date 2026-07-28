@@ -19,17 +19,13 @@ export function AddGoalForm({ kingdom, disabled }: { kingdom: KingdomKey; disabl
     }
 
     startTransition(async () => {
-      try {
-        const result = await addGoal(kingdom, title);
-        if (result.ok) {
-          setTitle("");
-        } else {
-          setNotice({ kind: "info", message: result.message });
-        }
-      } catch (err) {
+      const result = await addGoal(kingdom, title);
+      if (result.ok) {
+        setTitle("");
+      } else {
         setNotice({
-          kind: "error",
-          message: err instanceof Error ? err.message : "Something went wrong.",
+          kind: result.reason === "goal-cap" || result.reason === "duplicate-kingdom" ? "info" : "error",
+          message: result.message,
         });
       }
     });

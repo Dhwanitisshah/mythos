@@ -36,18 +36,12 @@ export function OnboardingForm() {
     formData.set("timezone", Intl.DateTimeFormat().resolvedOptions().timeZone ?? "");
 
     startTransition(async () => {
-      try {
-        await completeOnboarding(formData);
-      } catch (err) {
-        // redirect() inside the server action throws a special error whose
-        // digest starts with NEXT_REDIRECT; let it propagate so navigation
-        // actually happens instead of being swallowed as a form error.
-        const digest = (err as { digest?: string })?.digest;
-        if (typeof digest === "string" && digest.startsWith("NEXT_REDIRECT")) {
-          throw err;
-        }
-        setError(err instanceof Error ? err.message : "Something went wrong.");
-      }
+      // On success, completeOnboarding calls redirect() internally (which
+      // throws a special NEXT_REDIRECT error under the hood) and never
+      // returns — so this line only runs for an actual validation/save
+      // failure.
+      const result = await completeOnboarding(formData);
+      setError(result.message);
     });
   }
 

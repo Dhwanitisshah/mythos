@@ -1,5 +1,11 @@
 import Link from "next/link";
 
+// Forced dynamic so the per-request CSP nonce (see src/utils/security-headers.ts)
+// actually reaches this page's inline scripts — a statically prerendered
+// page's HTML is fixed at build time, so it can never carry a fresh
+// per-request nonce and would fail CSP script-src checks on every load.
+export const dynamic = "force-dynamic";
+
 export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-8 p-8 text-center">

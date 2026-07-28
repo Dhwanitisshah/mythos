@@ -10,10 +10,9 @@ export function GoalStatusButtons({ goalId }: { goalId: string }) {
   function handleClick(status: "done" | "dropped") {
     setError("");
     startTransition(async () => {
-      try {
-        await setGoalStatus(goalId, status);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong.");
+      const result = await setGoalStatus(goalId, status);
+      if (!result.ok) {
+        setError(result.message);
       }
     });
   }

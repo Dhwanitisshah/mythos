@@ -39,7 +39,10 @@ export function ComposeButtons() {
         return;
       }
       setNotice({
-        kind: result.reason === "insufficient-record" ? "info" : "error",
+        kind:
+          result.reason === "insufficient-record" || result.reason === "rate-limited"
+            ? "info"
+            : "error",
         message: result.message,
       });
     });

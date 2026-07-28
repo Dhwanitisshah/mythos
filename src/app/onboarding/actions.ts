@@ -5,7 +5,18 @@ import { createClient } from "@/utils/supabase/server";
 import type { Identity } from "@/lib/ai";
 import { isKingdomKey } from "@/lib/kingdoms";
 
-export async function completeOnboarding(formData: FormData) {
+const MAX_IDENTITY_FIELD_LENGTH = 500;
+const MAX_GOAL_TITLE_LENGTH = 200;
+
+export type CompleteOnboardingResult = { ok: false; message: string };
+
+function tooLong(value: string, max: number): boolean {
+  return value.length > max;
+}
+
+export async function completeOnboarding(
+  formData: FormData,
+): Promise<CompleteOnboardingResult> {
   const identity: Identity = {
     dream: String(formData.get("dream") ?? "").trim(),
     fear: String(formData.get("fear") ?? "").trim(),
@@ -21,10 +32,32 @@ export async function completeOnboarding(formData: FormData) {
     !identity.fear ||
     !identity.strength ||
     !identity.value ||
-    !goalTitle ||
-    !isKingdomKey(goalKingdom)
+    !goalTitle
   ) {
-    throw new Error("All fields are required");
+    return { ok: false, message: "Please answer every question before continuing." };
+  }
+
+  if (
+    tooLong(identity.dream, MAX_IDENTITY_FIELD_LENGTH) ||
+    tooLong(identity.fear, MAX_IDENTITY_FIELD_LENGTH) ||
+    tooLong(identity.strength, MAX_IDENTITY_FIELD_LENGTH) ||
+    tooLong(identity.value, MAX_IDENTITY_FIELD_LENGTH)
+  ) {
+    return {
+      ok: false,
+      message: `Keep each answer under ${MAX_IDENTITY_FIELD_LENGTH} characters.`,
+    };
+  }
+
+  if (tooLong(goalTitle, MAX_GOAL_TITLE_LENGTH)) {
+    return {
+      ok: false,
+      message: `Keep the goal title under ${MAX_GOAL_TITLE_LENGTH} characters.`,
+    };
+  }
+
+  if (!isKingdomKey(goalKingdom)) {
+    return { ok: false, message: "Please choose a kingdom for your first goal." };
   }
 
   const supabase = await createClient();
@@ -44,7 +77,7 @@ export async function completeOnboarding(formData: FormData) {
   });
 
   if (profileError) {
-    throw new Error(`Failed to save profile: ${profileError.message}`);
+    return { ok: false, message: "Could not save your profile. Try again." };
   }
 
   const { error: goalError } = await supabase.from("goals").insert({
@@ -55,7 +88,7 @@ export async function completeOnboarding(formData: FormData) {
   });
 
   if (goalError) {
-    throw new Error(`Failed to save goal: ${goalError.message}`);
+    return { ok: false, message: "Could not save your first goal. Try again." };
   }
 
   redirect("/journey");

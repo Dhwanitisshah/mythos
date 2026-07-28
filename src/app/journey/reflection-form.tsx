@@ -18,15 +18,11 @@ export function ReflectionForm({ chapterId }: { chapterId: string }) {
     }
 
     startTransition(async () => {
-      try {
-        const result = await submitReflection(chapterId, text);
-        if (!result.ok) {
-          setNotice({ kind: "info", message: result.message });
-        }
-      } catch (err) {
+      const result = await submitReflection(chapterId, text);
+      if (!result.ok) {
         setNotice({
-          kind: "error",
-          message: err instanceof Error ? err.message : "Something went wrong.",
+          kind: result.reason === "already-reflected" ? "info" : "error",
+          message: result.message,
         });
       }
     });
