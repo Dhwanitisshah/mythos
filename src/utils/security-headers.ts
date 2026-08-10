@@ -38,9 +38,18 @@ export function buildCsp(nonce: string): string {
   const supabase = supabaseOrigin();
   const connectSrc = ["'self'", supabase].filter(Boolean).join(" ");
 
+  // Turbopack/React's dev-mode HMR uses eval() for stack-trace
+  // reconstruction (a debugging aid only — React explicitly never uses
+  // eval() in production). Without 'unsafe-eval' the browser just logs a
+  // console warning and skips that feature rather than breaking the page,
+  // but there's no reason to keep it that loud locally — scope the
+  // allowance to dev only so production stays exactly as strict.
+  const isDev = process.env.NODE_ENV !== "production";
+  const scriptSrc = `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""};`;
+
   return `
     default-src 'self';
-    script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'unsafe-inline';
+    ${scriptSrc}
     style-src 'self' 'nonce-${nonce}' 'unsafe-inline';
     img-src 'self';
     font-src 'self';
