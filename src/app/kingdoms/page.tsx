@@ -2,7 +2,15 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import type { Quest } from "@/lib/ai";
-import { isKingdomKey, KINGDOM_KEYS, KINGDOMS, KINGDOM_ACCENT, type KingdomKey } from "@/lib/kingdoms";
+import {
+  conditionForProsperity,
+  isKingdomKey,
+  KINGDOM_KEYS,
+  KINGDOMS,
+  KINGDOM_ACCENT,
+  KINGDOM_CONDITION_LABEL,
+  type KingdomKey,
+} from "@/lib/kingdoms";
 import { KINGDOM_SIGIL } from "@/components/sigils";
 import { AddGoalForm } from "./add-goal-form";
 import { GoalStatusButtons } from "./goal-status-buttons";
@@ -65,6 +73,17 @@ export default async function KingdomsPage() {
     }
   }
 
+  const { data: kingdomStateRows } = await supabase
+    .from("kingdom_state")
+    .select("kingdom, prosperity")
+    .eq("user_id", user.id);
+
+  const prosperityByKingdom = new Map<KingdomKey, number>(
+    (kingdomStateRows ?? [])
+      .filter((r) => isKingdomKey(r.kingdom))
+      .map((r) => [r.kingdom as KingdomKey, r.prosperity as number]),
+  );
+
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-4xl flex-col gap-8 p-6 sm:p-8">
       <div className="flex items-center justify-between">
@@ -105,6 +124,8 @@ export default async function KingdomsPage() {
           const Sigil = KINGDOM_SIGIL[key];
           const accent = KINGDOM_ACCENT[key];
           const dormant = !goal;
+          const prosperity = prosperityByKingdom.get(key) ?? 50;
+          const condition = conditionForProsperity(prosperity);
 
           return (
             <div
@@ -147,6 +168,18 @@ export default async function KingdomsPage() {
                     {strength} quest{strength === 1 ? "" : "s"} answered in the last{" "}
                     {STRENGTH_WINDOW_DAYS} days
                   </p>
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-parchment-faint">
+                      <span>{KINGDOM_CONDITION_LABEL[condition]}</span>
+                      <span>{prosperity}%</span>
+                    </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-ink">
+                      <div
+                        className="stat-bar-fill h-full rounded-full"
+                        style={{ width: `${prosperity}%`, backgroundColor: accent }}
+                      />
+                    </div>
+                  </div>
                   <GoalStatusButtons goalId={goal.id} />
                 </div>
               ) : (

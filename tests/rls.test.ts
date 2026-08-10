@@ -151,6 +151,13 @@ describe.skipIf(!hasEnv)("RLS data isolation", () => {
       recent_openings: [],
     });
     if (storyStateErr) throw new Error(`Seed failed (story_state): ${storyStateErr.message}`);
+
+    const { error: kingdomStateErr } = await userA.from("kingdom_state").insert({
+      user_id: userAId,
+      kingdom: "fitness",
+      prosperity: 50,
+    });
+    if (kingdomStateErr) throw new Error(`Seed failed (kingdom_state): ${kingdomStateErr.message}`);
   });
 
   afterAll(async () => {
@@ -429,6 +436,57 @@ describe.skipIf(!hasEnv)("RLS data isolation", () => {
 
       const { data: check } = await admin
         .from("story_state")
+        .select("user_id")
+        .eq("user_id", userAId);
+      expect(check).toHaveLength(1);
+    });
+  });
+
+  describe("kingdom_state", () => {
+    it("user A can read their own kingdom_state (positive control)", async () => {
+      const { data, error } = await userA
+        .from("kingdom_state")
+        .select("*")
+        .eq("user_id", userAId);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(1);
+    });
+
+    it("user B cannot select user A's kingdom_state", async () => {
+      const { data, error } = await userB
+        .from("kingdom_state")
+        .select("*")
+        .eq("user_id", userAId);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(0);
+    });
+
+    it("user B cannot update user A's kingdom_state", async () => {
+      const { data } = await userB
+        .from("kingdom_state")
+        .update({ prosperity: 999 })
+        .eq("user_id", userAId)
+        .select();
+      expect(data ?? []).toHaveLength(0);
+
+      const { data: check } = await admin
+        .from("kingdom_state")
+        .select("prosperity")
+        .eq("user_id", userAId)
+        .single();
+      expect(check?.prosperity).toBe(50);
+    });
+
+    it("user B cannot delete user A's kingdom_state", async () => {
+      const { data } = await userB
+        .from("kingdom_state")
+        .delete()
+        .eq("user_id", userAId)
+        .select();
+      expect(data ?? []).toHaveLength(0);
+
+      const { data: check } = await admin
+        .from("kingdom_state")
         .select("user_id")
         .eq("user_id", userAId);
       expect(check).toHaveLength(1);

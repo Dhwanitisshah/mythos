@@ -40,3 +40,22 @@ export const KINGDOM_ACCENT: Record<KingdomKey, string> = {
   money: "var(--color-kingdom-money)",
   mind: "var(--color-kingdom-mind)",
 };
+
+// Phase 11: a kingdom's "condition" is a label DERIVED from its persistent
+// prosperity score (src/lib/kingdom-state.ts) — never stored itself, so
+// there's exactly one place the prosperity thresholds live.
+export type KingdomCondition = "flourishing" | "steady" | "waning" | "fallow";
+
+export const KINGDOM_CONDITION_LABEL: Record<KingdomCondition, string> = {
+  flourishing: "Flourishing",
+  steady: "Steady",
+  waning: "Waning",
+  fallow: "Fallow",
+};
+
+export function conditionForProsperity(prosperity: number): KingdomCondition {
+  if (prosperity >= 75) return "flourishing";
+  if (prosperity >= 45) return "steady";
+  if (prosperity >= 20) return "waning";
+  return "fallow";
+}

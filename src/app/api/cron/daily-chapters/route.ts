@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { generateDailyChapter } from "@/lib/generate-daily-chapter";
-import { getLocalHour } from "@/lib/timezone";
+import { getLocalDateString, getLocalHour } from "@/lib/timezone";
+import { applyNightlyDecay } from "@/lib/kingdom-state";
+import { isKingdomKey, type KingdomKey } from "@/lib/kingdoms";
 
 // Several sequential Gemini calls (one per due user) can comfortably exceed
 // the platform default of 10s.
@@ -42,6 +44,7 @@ export async function GET(request: Request) {
   let created = 0;
   let skipped = 0;
   let failed = 0;
+  let decayed = 0;
   const details: UserDetail[] = [];
 
   // Sequential on purpose: the Gemini free tier is rate-limited (15 req/min),
@@ -58,6 +61,38 @@ export async function GET(request: Request) {
       failed += 1;
       details.push({ userId: profile.id, result: `error: invalid timezone "${timezone}"` });
       continue;
+    }
+
+    // Kingdom prosperity decay (Phase 11) is a once-per-local-day
+    // bookkeeping tick, independent of the morning window below — that
+    // window only governs chapter *writing* time. Decay is idempotent via
+    // last_decayed_on, so evaluating it on every invocation is safe even
+    // though this route only fires once daily. Best-effort: a failure here
+    // must never block this user's chapter generation below.
+    try {
+      const localToday = getLocalDateString(timezone);
+      const { data: activeGoals, error: goalsError } = await supabase
+        .from("goals")
+        .select("kingdom")
+        .eq("user_id", profile.id)
+        .eq("status", "active");
+
+      if (goalsError) {
+        throw new Error(goalsError.message);
+      }
+
+      const activeKingdoms = [
+        ...new Set((activeGoals ?? []).map((g) => g.kingdom).filter(isKingdomKey)),
+      ] as KingdomKey[];
+
+      for (const kingdom of activeKingdoms) {
+        const result = await applyNightlyDecay(supabase, profile.id, kingdom, localToday);
+        if (result === "decayed") decayed += 1;
+      }
+    } catch (err) {
+      console.error(
+        `Kingdom decay failed for user ${profile.id}: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
 
     if (localHour < MORNING_WINDOW_START_HOUR || localHour >= MORNING_WINDOW_END_HOUR) {
@@ -92,5 +127,5 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ processed, created, skipped, failed, details });
+  return NextResponse.json({ processed, created, skipped, failed, decayed, details });
 }

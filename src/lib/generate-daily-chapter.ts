@@ -4,6 +4,7 @@ import {
   updateStoryMemory,
   type GoalInput,
   type Identity,
+  type KingdomConditionInput,
   type Momentum,
   type PreviousContext,
   type Quest,
@@ -11,7 +12,7 @@ import {
   type StatTrend,
   type StoryMemory,
 } from "@/lib/ai";
-import { isKingdomKey, type KingdomKey } from "@/lib/kingdoms";
+import { conditionForProsperity, isKingdomKey, type KingdomKey } from "@/lib/kingdoms";
 import { isSameLocalDay } from "@/lib/timezone";
 import { mergeMotifs, parseMotifs, pushOpening } from "@/lib/story-memory";
 
@@ -151,6 +152,35 @@ export async function generateDailyChapter(
       activeKingdoms,
     };
 
+    // Kingdom conditions (Phase 11) are enrichment too — a failed load just
+    // means this chapter generates without them, same principle as story
+    // memory below. Missing rows (a kingdom never yet touched) default to
+    // the same prosperity=50 the DB itself defaults a fresh row to — this
+    // is the grounded starting state, not an invented one.
+    let kingdomConditions: KingdomConditionInput[] = [];
+    try {
+      const { data: kingdomStateRows, error: kingdomStateError } = await supabase
+        .from("kingdom_state")
+        .select("kingdom, prosperity")
+        .eq("user_id", userId)
+        .in("kingdom", activeKingdoms);
+
+      if (kingdomStateError) throw new Error(kingdomStateError.message);
+
+      const prosperityByKingdom = new Map(
+        (kingdomStateRows ?? []).map((r) => [r.kingdom as string, r.prosperity as number]),
+      );
+
+      kingdomConditions = activeKingdoms.map((kingdom) => {
+        const prosperity = prosperityByKingdom.get(kingdom) ?? 50;
+        return { kingdom, prosperity, condition: conditionForProsperity(prosperity) };
+      });
+    } catch (err) {
+      console.error(
+        `Could not load kingdom state for user ${userId}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+
     // Story memory is enrichment, never a blocker (Phase 10) — a failed
     // load just means this chapter generates without it, same as before
     // memory existed at all.
@@ -211,6 +241,7 @@ export async function generateDailyChapter(
       previousContext,
       storyMemory,
       momentum,
+      kingdomConditions,
     });
 
     const { data: inserted, error: insertError } = await supabase

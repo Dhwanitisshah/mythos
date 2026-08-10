@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { KINGDOMS, type KingdomKey } from "./kingdoms";
+import { KINGDOMS, KINGDOM_CONDITION_LABEL, type KingdomCondition, type KingdomKey } from "./kingdoms";
 import { serverEnv } from "./env";
 
 // "gemini-flash-latest" is Google's alias that always points at the current
@@ -117,6 +117,15 @@ export type Momentum = {
   activeKingdoms: KingdomKey[];
 };
 
+// Phase 11: a kingdom's condition, derived entirely from its persistent
+// prosperity score (src/lib/kingdom-state.ts + conditionForProsperity in
+// src/lib/kingdoms.ts) — a grounded fact, never invented.
+export type KingdomConditionInput = {
+  kingdom: KingdomKey;
+  prosperity: number;
+  condition: KingdomCondition;
+};
+
 type GenerateChapterInput = {
   identity: Identity;
   goals: GoalInput[];
@@ -127,6 +136,7 @@ type GenerateChapterInput = {
   previousContext?: PreviousContext;
   storyMemory?: StoryMemory;
   momentum?: Momentum;
+  kingdomConditions?: KingdomConditionInput[];
 };
 
 function buildResponseSchema(kingdomKeys: KingdomKey[]) {
@@ -221,6 +231,18 @@ function buildMomentumSection(momentum: Momentum | null | undefined): string {
   return `\n\nMomentum — a real signal to color tone with, not a license to invent events: over the last 7 days they completed ${completionPct}% of the quests given to them. ${trendLine} Do not invent specific new triumphs or setbacks beyond what's already stated elsewhere in this prompt — this signal shapes mood only.`;
 }
 
+function buildKingdomConditionsSection(
+  kingdomConditions: KingdomConditionInput[] | undefined,
+): string {
+  if (!kingdomConditions || kingdomConditions.length === 0) return "";
+
+  const lines = kingdomConditions
+    .map((k) => `- ${KINGDOMS[k.kingdom]}: ${KINGDOM_CONDITION_LABEL[k.condition]}`)
+    .join("\n");
+
+  return `\n\nEach kingdom's current condition — earned entirely from the real record of quests completed and neglected there. Let it color this chapter's tone for that kingdom without stating the label or a number outright: a Flourishing kingdom should read as ascendant and strong; a Waning or Fallow kingdom should read as weakening or crumbling. GROUNDED ONLY: reflect the condition given, never invent a specific new event, number, or fact to explain it.\n${lines}`;
+}
+
 function buildPrompt({
   identity,
   goals,
@@ -229,6 +251,7 @@ function buildPrompt({
   previousContext,
   storyMemory,
   momentum,
+  kingdomConditions,
 }: GenerateChapterInput) {
   return `You are the narrator of a dark, elegant, cinematic epic — think Game of Thrones crossed with Persona 5. You are writing chapter ${chapterNumber} of the reader's own story, addressed to them in second person ("you"). The reader rules several kingdoms, each a real-world goal in a different domain of their life.
 
@@ -241,6 +264,7 @@ The reader:
 Their active kingdoms and the real-world goal each represents:
 ${buildGoalsSection(goals)}
 ${buildNeglectSection(neglectedKingdoms)}
+${buildKingdomConditionsSection(kingdomConditions)}
 ${buildPreviousContextSection(previousContext ?? null)}
 ${buildStoryMemorySection(storyMemory)}
 ${buildMomentumSection(momentum)}

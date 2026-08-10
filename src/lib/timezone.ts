@@ -14,6 +14,13 @@ export function isSameLocalDay(isoDate: string, timeZone: string | null): boolea
   return localDayKey(new Date(isoDate), zone) === localDayKey(new Date(), zone);
 }
 
+// "Today" as a YYYY-MM-DD string in the given IANA timezone — used to stamp
+// kingdom_state.last_activity_on / last_decayed_on (Phase 11) in the user's
+// own local day, same correctness rationale as isSameLocalDay above.
+export function getLocalDateString(timeZone: string | null, date: Date = new Date()): string {
+  return localDayKey(date, timeZone ?? "UTC");
+}
+
 // Current local hour (0-23) in the given IANA timezone, used by the cron
 // route to only generate chapters during a user's morning window.
 export function getLocalHour(timeZone: string, date: Date = new Date()): number {

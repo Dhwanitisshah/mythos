@@ -1,4 +1,4 @@
--- Mythos canonical schema (Phase 1 + Phase 2 + Phase 3 + Phase 4 + Phase 5 + Phase 7 + Phase 9 + Phase 10)
+-- Mythos canonical schema (Phase 1 + Phase 2 + Phase 3 + Phase 4 + Phase 5 + Phase 7 + Phase 9 + Phase 10 + Phase 11)
 -- Paste this entire file into the Supabase SQL editor and run it.
 --
 -- Phase 4 (kingdoms) note: the six life domains a goal can belong to are NOT
@@ -27,6 +27,14 @@
 -- story memory (arc summary capped ~150 words, motifs capped at 12 entries,
 -- recent_openings capped at 5) — see src/lib/ai.ts and src/lib/story-memory.ts.
 -- No query ever loads full chapter history into a prompt.
+--
+-- Phase 11 (grounded world simulation) note: `kingdom_state` tracks each
+-- kingdom's prosperity, moved ONLY by real activity (quest completion raises
+-- it, sustained neglect decays it) — see src/lib/kingdom-state.ts. The
+-- "condition" label (Flourishing/Steady/Waning/Fallow) is derived from
+-- prosperity in code (conditionForProsperity in src/lib/kingdoms.ts), never
+-- stored, and deliberately not a DB view (views bypass RLS unless
+-- security_invoker is set).
 
 create table if not exists profiles (
   id uuid primary key references auth.users (id) on delete cascade,
@@ -110,6 +118,16 @@ create table if not exists story_state (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists kingdom_state (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  kingdom text not null,
+  prosperity int not null default 50,
+  last_activity_on date,
+  last_decayed_on date,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, kingdom)
+);
+
 create index if not exists goals_user_id_idx on goals (user_id);
 create index if not exists goals_kingdom_idx on goals (kingdom);
 create index if not exists chapters_user_id_idx on chapters (user_id);
@@ -127,6 +145,7 @@ alter table stat_events enable row level security;
 alter table books enable row level security;
 alter table generation_throttle enable row level security;
 alter table story_state enable row level security;
+alter table kingdom_state enable row level security;
 
 drop policy if exists "profiles_select_own" on profiles;
 create policy "profiles_select_own" on profiles
@@ -221,4 +240,17 @@ create policy "story_state_update_own" on story_state
   for update using (user_id = auth.uid()) with check (user_id = auth.uid());
 drop policy if exists "story_state_delete_own" on story_state;
 create policy "story_state_delete_own" on story_state
+  for delete using (user_id = auth.uid());
+
+drop policy if exists "kingdom_state_select_own" on kingdom_state;
+create policy "kingdom_state_select_own" on kingdom_state
+  for select using (user_id = auth.uid());
+drop policy if exists "kingdom_state_insert_own" on kingdom_state;
+create policy "kingdom_state_insert_own" on kingdom_state
+  for insert with check (user_id = auth.uid());
+drop policy if exists "kingdom_state_update_own" on kingdom_state;
+create policy "kingdom_state_update_own" on kingdom_state
+  for update using (user_id = auth.uid()) with check (user_id = auth.uid());
+drop policy if exists "kingdom_state_delete_own" on kingdom_state;
+create policy "kingdom_state_delete_own" on kingdom_state
   for delete using (user_id = auth.uid());

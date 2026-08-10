@@ -13,6 +13,8 @@ import {
 } from "@/lib/ai";
 import { generateDailyChapter } from "@/lib/generate-daily-chapter";
 import { checkAndClaimThrottle } from "@/lib/rate-limit";
+import { applyQuestToggleToKingdomState } from "@/lib/kingdom-state";
+import { getLocalDateString } from "@/lib/timezone";
 
 const CHAPTER_THROTTLE_SECONDS = 30;
 
@@ -216,10 +218,33 @@ export async function toggleQuest(
     } catch (err) {
       statsError = err instanceof Error ? err.message : "Failed to update stats";
     }
+
+    // Kingdom prosperity (Phase 11) is enrichment, same as story memory —
+    // never let it block a quest toggle that has already succeeded above.
+    try {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("timezone")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      await applyQuestToggleToKingdomState(
+        supabase,
+        user.id,
+        quest.kingdom,
+        nowDone,
+        getLocalDateString(profile?.timezone ?? null),
+      );
+    } catch (err) {
+      console.error(
+        `Failed to update kingdom_state for user ${user.id}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   revalidatePath("/journey");
   revalidatePath("/character");
+  revalidatePath("/kingdoms");
 
   return { ok: true, statsError };
 }
