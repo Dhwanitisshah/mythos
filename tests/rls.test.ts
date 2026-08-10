@@ -143,6 +143,14 @@ describe.skipIf(!hasEnv)("RLS data isolation", () => {
       source_chapter_ids: [chapterAId],
     });
     if (bookErr) throw new Error(`Seed failed (books): ${bookErr.message}`);
+
+    const { error: storyStateErr } = await userA.from("story_state").insert({
+      user_id: userAId,
+      arc_summary: "RLS test arc summary",
+      motifs: [],
+      recent_openings: [],
+    });
+    if (storyStateErr) throw new Error(`Seed failed (story_state): ${storyStateErr.message}`);
   });
 
   afterAll(async () => {
@@ -382,6 +390,47 @@ describe.skipIf(!hasEnv)("RLS data isolation", () => {
       expect(data ?? []).toHaveLength(0);
 
       const { data: check } = await admin.from("books").select("id").eq("user_id", userAId);
+      expect(check).toHaveLength(1);
+    });
+  });
+
+  describe("story_state", () => {
+    it("user A can read their own story_state (positive control)", async () => {
+      const { data, error } = await userA.from("story_state").select("*").eq("user_id", userAId);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(1);
+    });
+
+    it("user B cannot select user A's story_state", async () => {
+      const { data, error } = await userB.from("story_state").select("*").eq("user_id", userAId);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(0);
+    });
+
+    it("user B cannot update user A's story_state", async () => {
+      const { data } = await userB
+        .from("story_state")
+        .update({ arc_summary: "Hijacked" })
+        .eq("user_id", userAId)
+        .select();
+      expect(data ?? []).toHaveLength(0);
+
+      const { data: check } = await admin
+        .from("story_state")
+        .select("arc_summary")
+        .eq("user_id", userAId)
+        .single();
+      expect(check?.arc_summary).toBe("RLS test arc summary");
+    });
+
+    it("user B cannot delete user A's story_state", async () => {
+      const { data } = await userB.from("story_state").delete().eq("user_id", userAId).select();
+      expect(data ?? []).toHaveLength(0);
+
+      const { data: check } = await admin
+        .from("story_state")
+        .select("user_id")
+        .eq("user_id", userAId);
       expect(check).toHaveLength(1);
     });
   });

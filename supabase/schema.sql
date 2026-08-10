@@ -1,4 +1,4 @@
--- Mythos canonical schema (Phase 1 + Phase 2 + Phase 3 + Phase 4 + Phase 5 + Phase 7 + Phase 9)
+-- Mythos canonical schema (Phase 1 + Phase 2 + Phase 3 + Phase 4 + Phase 5 + Phase 7 + Phase 9 + Phase 10)
 -- Paste this entire file into the Supabase SQL editor and run it.
 --
 -- Phase 4 (kingdoms) note: the six life domains a goal can belong to are NOT
@@ -22,6 +22,11 @@
 -- Phase 9 (free production hardening) note: `generation_throttle` backs a
 -- best-effort per-user rate limit on the AI-calling actions — see
 -- src/lib/rate-limit.ts.
+--
+-- Phase 10 (chapter freshness) note: `story_state` is persistent, BOUNDED
+-- story memory (arc summary capped ~150 words, motifs capped at 12 entries,
+-- recent_openings capped at 5) — see src/lib/ai.ts and src/lib/story-memory.ts.
+-- No query ever loads full chapter history into a prompt.
 
 create table if not exists profiles (
   id uuid primary key references auth.users (id) on delete cascade,
@@ -97,6 +102,14 @@ create table if not exists generation_throttle (
   last_book_request_at timestamptz
 );
 
+create table if not exists story_state (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  arc_summary text not null default '',
+  motifs jsonb not null default '[]',
+  recent_openings text[] not null default '{}',
+  updated_at timestamptz not null default now()
+);
+
 create index if not exists goals_user_id_idx on goals (user_id);
 create index if not exists goals_kingdom_idx on goals (kingdom);
 create index if not exists chapters_user_id_idx on chapters (user_id);
@@ -113,6 +126,7 @@ alter table stats enable row level security;
 alter table stat_events enable row level security;
 alter table books enable row level security;
 alter table generation_throttle enable row level security;
+alter table story_state enable row level security;
 
 drop policy if exists "profiles_select_own" on profiles;
 create policy "profiles_select_own" on profiles
@@ -195,3 +209,16 @@ create policy "generation_throttle_insert_own" on generation_throttle
 drop policy if exists "generation_throttle_update_own" on generation_throttle;
 create policy "generation_throttle_update_own" on generation_throttle
   for update using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+drop policy if exists "story_state_select_own" on story_state;
+create policy "story_state_select_own" on story_state
+  for select using (user_id = auth.uid());
+drop policy if exists "story_state_insert_own" on story_state;
+create policy "story_state_insert_own" on story_state
+  for insert with check (user_id = auth.uid());
+drop policy if exists "story_state_update_own" on story_state;
+create policy "story_state_update_own" on story_state
+  for update using (user_id = auth.uid()) with check (user_id = auth.uid());
+drop policy if exists "story_state_delete_own" on story_state;
+create policy "story_state_delete_own" on story_state
+  for delete using (user_id = auth.uid());

@@ -43,6 +43,12 @@ export default async function LibraryPage() {
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
+  const { data: storyState } = await supabase
+    .from("story_state")
+    .select("arc_summary")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-8 p-6 sm:p-8">
       <div className="flex items-center justify-between">
@@ -70,6 +76,21 @@ export default async function LibraryPage() {
           </Link>
         </div>
       </div>
+
+      <section className="rounded-lg border border-ink-border bg-ink-raised/30 p-5">
+        <p className="mb-2 text-[11px] uppercase tracking-[0.2em] text-parchment-faint">
+          The Story So Far
+        </p>
+        {storyState?.arc_summary ? (
+          <p className="font-display text-[15px] italic leading-relaxed text-parchment-dim">
+            {storyState.arc_summary}
+          </p>
+        ) : (
+          <p className="text-sm italic text-parchment-faint">
+            Your legend is still being written.
+          </p>
+        )}
+      </section>
 
       <section className="rounded-lg border border-ink-border bg-ink-raised/50 p-4">
         <p className="mb-3 text-[11px] uppercase tracking-[0.2em] text-parchment-faint">
