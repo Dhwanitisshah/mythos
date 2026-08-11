@@ -35,6 +35,13 @@ function loadDotEnvLocal() {
 loadDotEnvLocal();
 
 export default defineConfig({
+  resolve: {
+    // Mirrors the "@/*" -> "./src/*" path in tsconfig.json so unit tests can
+    // import app code the same way the app itself does.
+    alias: {
+      "@": resolve(__dirname, "src"),
+    },
+  },
   test: {
     include: ["tests/**/*.test.ts"],
     // RLS tests hit a real network (Supabase) and create/sign-in/delete users.

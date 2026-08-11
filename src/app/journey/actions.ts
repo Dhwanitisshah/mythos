@@ -15,6 +15,7 @@ import { generateDailyChapter } from "@/lib/generate-daily-chapter";
 import { checkAndClaimThrottle } from "@/lib/rate-limit";
 import { applyQuestToggleToKingdomState } from "@/lib/kingdom-state";
 import { getLocalDateString } from "@/lib/timezone";
+import { computePowerLevel, rankFor, tierIndexByName } from "@/lib/rank";
 
 const CHAPTER_THROTTLE_SECONDS = 30;
 
@@ -238,6 +239,34 @@ export async function toggleQuest(
     } catch (err) {
       console.error(
         `Failed to update kingdom_state for user ${user.id}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+
+    // Phase 12: rank is derived, never stored — this just checks whether the
+    // toggle crossed a tier boundary so it's visible in logs. The actual
+    // one-time reveal is detected and persisted by /character on next load,
+    // never here; this recompute never blocks or writes anything.
+    try {
+      const [{ data: statsRow }, { data: kingdomRows }, { data: profileRow }] = await Promise.all([
+        supabase.from("stats").select(STAT_NAMES.join(",")).eq("user_id", user.id).maybeSingle(),
+        supabase.from("kingdom_state").select("prosperity").eq("user_id", user.id),
+        supabase.from("profiles").select("last_acknowledged_tier").eq("id", user.id).maybeSingle(),
+      ]);
+
+      if (statsRow) {
+        const powerLevel = computePowerLevel({
+          stats: statsRow as unknown as Record<StatName, number>,
+          kingdomStates: (kingdomRows ?? []).map((r) => r.prosperity as number),
+        });
+        const { index } = rankFor(powerLevel);
+        const lastIndex = tierIndexByName(profileRow?.last_acknowledged_tier ?? null);
+        if (lastIndex !== -1 && index > lastIndex) {
+          console.log(`User ${user.id} crossed a rank tier — ascension pending on next /character load.`);
+        }
+      }
+    } catch (err) {
+      console.error(
+        `Failed to check rank for user ${user.id}: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
   }

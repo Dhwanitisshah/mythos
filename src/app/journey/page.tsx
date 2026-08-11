@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
-import type { Quest, ReflectionExtracted } from "@/lib/ai";
-import { isKingdomKey, KINGDOMS, type KingdomKey } from "@/lib/kingdoms";
+import { STAT_NAMES, type Quest, type ReflectionExtracted, type StatName } from "@/lib/ai";
+import { isKingdomKey, KINGDOMS, KINGDOM_KEYS, type KingdomKey } from "@/lib/kingdoms";
+import { computePowerLevel, rankFor } from "@/lib/rank";
 import { isSameLocalDay } from "@/lib/timezone";
 import { SignOutButton } from "./sign-out-button";
 import { BeginChapterButton } from "./begin-chapter-button";
@@ -14,6 +15,17 @@ import { TimezoneSync } from "./timezone-sync";
 // a single Gemini call that can exceed the platform default of 10s — same
 // rationale as the cron route's maxDuration.
 export const maxDuration = 60;
+
+const DEFAULT_STATS: Record<StatName, number> = {
+  discipline: 10,
+  strength: 10,
+  wisdom: 10,
+  calm: 10,
+  honor: 10,
+  charisma: 10,
+};
+
+const DEFAULT_PROSPERITY = 50;
 
 export default async function JourneyPage() {
   const supabase = await createClient();
@@ -46,6 +58,28 @@ export default async function JourneyPage() {
     (g): g is { id: string; title: string; kingdom: KingdomKey } => isKingdomKey(g.kingdom),
   );
 
+  const { data: statsRow } = await supabase
+    .from("stats")
+    .select(STAT_NAMES.join(","))
+    .eq("user_id", user.id)
+    .maybeSingle();
+  const stats: Record<StatName, number> = statsRow
+    ? (statsRow as unknown as Record<StatName, number>)
+    : DEFAULT_STATS;
+
+  const { data: kingdomStateRows } = await supabase
+    .from("kingdom_state")
+    .select("kingdom, prosperity")
+    .eq("user_id", user.id);
+  const prosperityByKingdom = new Map<string, number>(
+    (kingdomStateRows ?? [])
+      .filter((r) => isKingdomKey(r.kingdom))
+      .map((r) => [r.kingdom as string, r.prosperity as number]),
+  );
+  const kingdomStates = KINGDOM_KEYS.map((k) => prosperityByKingdom.get(k) ?? DEFAULT_PROSPERITY);
+  const powerLevel = computePowerLevel({ stats, kingdomStates });
+  const rank = rankFor(powerLevel);
+
   const { data: chapters } = await supabase
     .from("chapters")
     .select(
@@ -71,6 +105,13 @@ export default async function JourneyPage() {
           Your Journey
         </h1>
         <div className="flex items-center gap-4">
+          <Link
+            href="/character"
+            className="hidden items-center gap-1.5 text-xs uppercase tracking-[0.15em] text-parchment-faint transition-colors hover:text-gold-bright sm:flex"
+          >
+            <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: rank.tier.accent }} />
+            {rank.tier.name} · {powerLevel}
+          </Link>
           <Link
             href="/kingdoms"
             className="text-sm text-parchment-dim underline decoration-ink-border underline-offset-4 transition-colors hover:text-gold-bright"

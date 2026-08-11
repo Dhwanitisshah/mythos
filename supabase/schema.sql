@@ -1,4 +1,4 @@
--- Mythos canonical schema (Phase 1 + Phase 2 + Phase 3 + Phase 4 + Phase 5 + Phase 7 + Phase 9 + Phase 10 + Phase 11)
+-- Mythos canonical schema (Phase 1 + Phase 2 + Phase 3 + Phase 4 + Phase 5 + Phase 7 + Phase 9 + Phase 10 + Phase 11 + Phase 12)
 -- Paste this entire file into the Supabase SQL editor and run it.
 --
 -- Phase 4 (kingdoms) note: the six life domains a goal can belong to are NOT
@@ -35,6 +35,12 @@
 -- prosperity in code (conditionForProsperity in src/lib/kingdoms.ts), never
 -- stored, and deliberately not a DB view (views bypass RLS unless
 -- security_invoker is set).
+--
+-- Phase 12 (rank & ascension) note: Power Level and rank tier are likewise
+-- derived entirely in code from the six stats + average kingdom prosperity
+-- (src/lib/rank.ts) — never stored. `profiles.last_acknowledged_tier` is the
+-- only new state: which tier the user has already seen the ascension reveal
+-- for, so it fires exactly once per tier crossed.
 
 create table if not exists profiles (
   id uuid primary key references auth.users (id) on delete cascade,
@@ -42,6 +48,7 @@ create table if not exists profiles (
   onboarded_at timestamptz,
   timezone text,
   auto_chapter boolean not null default true, -- Phase 5: opt out of overnight auto-writer
+  last_acknowledged_tier text, -- Phase 12: rank tier name the ascension reveal has already fired for
   created_at timestamptz not null default now()
 );
 

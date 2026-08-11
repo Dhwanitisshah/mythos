@@ -2,7 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { STAT_NAMES, type StatName } from "@/lib/ai";
+import { KINGDOM_KEYS, isKingdomKey } from "@/lib/kingdoms";
+import { computePowerLevel, rankFor, tierIndexByName } from "@/lib/rank";
 import { AutoChapterToggle } from "./auto-chapter-toggle";
+import { AscensionReveal } from "./ascension-reveal";
+import { PowerRing } from "./power-ring";
+import { TierLadder } from "./tier-ladder";
 
 const DEFAULT_STATS: Record<StatName, number> = {
   discipline: 10,
@@ -12,6 +17,8 @@ const DEFAULT_STATS: Record<StatName, number> = {
   honor: 10,
   charisma: 10,
 };
+
+const DEFAULT_PROSPERITY = 50;
 
 export default async function CharacterPage() {
   const supabase = await createClient();
@@ -25,7 +32,7 @@ export default async function CharacterPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("onboarded_at, auto_chapter")
+    .select("onboarded_at, auto_chapter, last_acknowledged_tier")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -42,6 +49,39 @@ export default async function CharacterPage() {
   const stats: Record<StatName, number> = statsRow
     ? (statsRow as unknown as Record<StatName, number>)
     : DEFAULT_STATS;
+
+  const { data: kingdomStateRows } = await supabase
+    .from("kingdom_state")
+    .select("kingdom, prosperity")
+    .eq("user_id", user.id);
+
+  const prosperityByKingdom = new Map<string, number>(
+    (kingdomStateRows ?? [])
+      .filter((r) => isKingdomKey(r.kingdom))
+      .map((r) => [r.kingdom as string, r.prosperity as number]),
+  );
+  const kingdomStates = KINGDOM_KEYS.map((k) => prosperityByKingdom.get(k) ?? DEFAULT_PROSPERITY);
+
+  const powerLevel = computePowerLevel({ stats, kingdomStates });
+  const rank = rankFor(powerLevel);
+
+  const lastAcknowledgedIndex = tierIndexByName(profile.last_acknowledged_tier ?? null);
+  const isFirstEverLoad = profile.last_acknowledged_tier == null;
+  const ascended = !isFirstEverLoad && rank.index > lastAcknowledgedIndex;
+
+  if (isFirstEverLoad) {
+    // New users start on whatever tier their starting stats land on — that's
+    // not an ascension, just the baseline. Set it silently so nothing fires
+    // on their first real climb later.
+    try {
+      await supabase
+        .from("profiles")
+        .update({ last_acknowledged_tier: rank.tier.name })
+        .eq("id", user.id);
+    } catch {
+      // Best-effort — worst case this repeats until it succeeds.
+    }
+  }
 
   const { data: events } = await supabase
     .from("stat_events")
@@ -77,6 +117,29 @@ export default async function CharacterPage() {
           </Link>
         </div>
       </div>
+
+      {ascended && <AscensionReveal tierName={rank.tier.name} accent={rank.tier.accent} />}
+
+      <section className="flex flex-col gap-6 rounded-lg border border-ink-border bg-ink-raised/50 p-5 sm:flex-row sm:items-center">
+        <PowerRing powerLevel={powerLevel} rank={rank} />
+        <div className="flex flex-1 flex-col gap-3">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.3em] text-parchment-faint">Rank</p>
+            <h2
+              className="font-display text-2xl font-semibold tracking-wide sm:text-3xl"
+              style={{ color: rank.tier.accent }}
+            >
+              {rank.tier.name}
+            </h2>
+            <p className="text-xs text-parchment-dim">
+              {rank.nextTier
+                ? `${rank.pointsToNext} to ${rank.nextTier.name}`
+                : `${rank.tier.name} — the summit`}
+            </p>
+          </div>
+          <TierLadder currentIndex={rank.index} />
+        </div>
+      </section>
 
       <section className="rounded-lg border border-ink-border bg-ink-raised/50 p-4">
         <AutoChapterToggle initialValue={profile.auto_chapter ?? true} />
