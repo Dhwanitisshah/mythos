@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import type { Identity } from "@/lib/ai";
 import { isKingdomKey } from "@/lib/kingdoms";
+import { isAvatarStyleKey, sanitizeSeed } from "@/lib/avatar";
 
 const MAX_IDENTITY_FIELD_LENGTH = 500;
 const MAX_GOAL_TITLE_LENGTH = 200;
@@ -26,6 +27,8 @@ export async function completeOnboarding(
   const goalTitle = String(formData.get("goalTitle") ?? "").trim();
   const goalKingdom = String(formData.get("goalKingdom") ?? "");
   const timezone = String(formData.get("timezone") ?? "").trim();
+  const avatarStyleInput = String(formData.get("avatarStyle") ?? "");
+  const avatarSeedInput = String(formData.get("avatarSeed") ?? "");
 
   if (
     !identity.dream ||
@@ -69,11 +72,19 @@ export async function completeOnboarding(
     redirect("/login");
   }
 
+  // Avatar choice is optional/best-effort validation — an unrecognized style
+  // just falls back to null, which the reading side (generateAvatarSvg
+  // callers) already treats as "use the default", never a hard failure.
+  const avatarStyle = isAvatarStyleKey(avatarStyleInput) ? avatarStyleInput : null;
+  const avatarSeed = avatarStyle ? sanitizeSeed(avatarSeedInput) || null : null;
+
   const { error: profileError } = await supabase.from("profiles").upsert({
     id: user.id,
     identity,
     onboarded_at: new Date().toISOString(),
     timezone: timezone || null,
+    avatar_style: avatarStyle,
+    avatar_seed: avatarSeed,
   });
 
   if (profileError) {

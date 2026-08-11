@@ -3,6 +3,8 @@
 import { useState, useTransition } from "react";
 import { completeOnboarding } from "./actions";
 import { KINGDOM_LIST } from "@/lib/kingdoms";
+import { DEFAULT_AVATAR_STYLE, randomSeed, type AvatarStyleKey } from "@/lib/avatar-styles";
+import { AvatarStep } from "./avatar-step";
 
 const inputClass =
   "rounded border border-ink-border bg-ink-raised px-3 py-2 text-parchment placeholder:text-parchment-faint focus:border-gold";
@@ -14,6 +16,8 @@ export function OnboardingForm() {
   const [value, setValue] = useState("");
   const [goalTitle, setGoalTitle] = useState("");
   const [goalKingdom, setGoalKingdom] = useState<string>(KINGDOM_LIST[0].key);
+  const [avatarStyle, setAvatarStyle] = useState<AvatarStyleKey>(DEFAULT_AVATAR_STYLE);
+  const [avatarSeed, setAvatarSeed] = useState(() => randomSeed());
   const [error, setError] = useState("");
   const [isPending, startTransition] = useTransition();
 
@@ -33,6 +37,8 @@ export function OnboardingForm() {
     formData.set("value", value);
     formData.set("goalTitle", goalTitle);
     formData.set("goalKingdom", goalKingdom);
+    formData.set("avatarStyle", avatarStyle);
+    formData.set("avatarSeed", avatarSeed);
     formData.set("timezone", Intl.DateTimeFormat().resolvedOptions().timeZone ?? "");
 
     startTransition(async () => {
@@ -124,6 +130,13 @@ export function OnboardingForm() {
           </select>
         </label>
       </fieldset>
+
+      <AvatarStep
+        style={avatarStyle}
+        seed={avatarSeed}
+        onStyleChange={setAvatarStyle}
+        onSeedChange={setAvatarSeed}
+      />
 
       {error && <p className="text-sm text-crimson-bright">{error}</p>}
 

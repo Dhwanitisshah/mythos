@@ -1,4 +1,4 @@
--- Mythos canonical schema (Phase 1 + Phase 2 + Phase 3 + Phase 4 + Phase 5 + Phase 7 + Phase 9 + Phase 10 + Phase 11 + Phase 12)
+-- Mythos canonical schema (Phase 1 + Phase 2 + Phase 3 + Phase 4 + Phase 5 + Phase 7 + Phase 9 + Phase 10 + Phase 11 + Phase 12 + Phase 13)
 -- Paste this entire file into the Supabase SQL editor and run it.
 --
 -- Phase 4 (kingdoms) note: the six life domains a goal can belong to are NOT
@@ -41,6 +41,11 @@
 -- (src/lib/rank.ts) — never stored. `profiles.last_acknowledged_tier` is the
 -- only new state: which tier the user has already seen the ascension reveal
 -- for, so it fires exactly once per tier crossed.
+--
+-- Phase 13 (avatars) note: the avatar SVG is never stored — it's
+-- regenerated on every render from (avatar_style, avatar_seed) via
+-- src/lib/avatar.ts. Both nullable; null falls back in code to a default
+-- style and to the user's own id as the seed.
 
 create table if not exists profiles (
   id uuid primary key references auth.users (id) on delete cascade,
@@ -49,6 +54,8 @@ create table if not exists profiles (
   timezone text,
   auto_chapter boolean not null default true, -- Phase 5: opt out of overnight auto-writer
   last_acknowledged_tier text, -- Phase 12: rank tier name the ascension reveal has already fired for
+  avatar_style text, -- Phase 13: DiceBear style key, see src/lib/avatar.ts
+  avatar_seed text, -- Phase 13: DiceBear seed; null defaults to the user's id
   created_at timestamptz not null default now()
 );
 

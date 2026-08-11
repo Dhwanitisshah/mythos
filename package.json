@@ -10,6 +10,8 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@dicebear/collection": "^9.4.3",
+    "@dicebear/core": "^9.4.3",
     "@google/genai": "^2.11.0",
     "@supabase/ssr": "^0.12.1",
     "@supabase/supabase-js": "^2.110.3",

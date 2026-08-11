@@ -4,7 +4,9 @@ import { createClient } from "@/utils/supabase/server";
 import { STAT_NAMES, type Quest, type ReflectionExtracted, type StatName } from "@/lib/ai";
 import { isKingdomKey, KINGDOMS, KINGDOM_KEYS, type KingdomKey } from "@/lib/kingdoms";
 import { computePowerLevel, rankFor } from "@/lib/rank";
+import { DEFAULT_AVATAR_STYLE, generateAvatarSvg, isAvatarStyleKey } from "@/lib/avatar";
 import { isSameLocalDay } from "@/lib/timezone";
+import { AvatarFrame } from "../character/avatar-frame";
 import { SignOutButton } from "./sign-out-button";
 import { BeginChapterButton } from "./begin-chapter-button";
 import { QuestChecklist } from "./quest-checklist";
@@ -39,13 +41,17 @@ export default async function JourneyPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("onboarded_at, timezone")
+    .select("onboarded_at, timezone, avatar_style, avatar_seed")
     .eq("id", user.id)
     .maybeSingle();
 
   if (!profile?.onboarded_at) {
     redirect("/onboarding");
   }
+
+  const avatarStyle = isAvatarStyleKey(profile.avatar_style) ? profile.avatar_style : DEFAULT_AVATAR_STYLE;
+  const avatarSeed = profile.avatar_seed ?? user.id;
+  const avatarSvg = generateAvatarSvg(avatarStyle, avatarSeed);
 
   const { data: activeGoals } = await supabase
     .from("goals")
@@ -107,9 +113,9 @@ export default async function JourneyPage() {
         <div className="flex items-center gap-4">
           <Link
             href="/character"
-            className="hidden items-center gap-1.5 text-xs uppercase tracking-[0.15em] text-parchment-faint transition-colors hover:text-gold-bright sm:flex"
+            className="hidden items-center gap-2 text-xs uppercase tracking-[0.15em] text-parchment-faint transition-colors hover:text-gold-bright sm:flex"
           >
-            <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: rank.tier.accent }} />
+            <AvatarFrame svg={avatarSvg} rank={rank} size={22} />
             {rank.tier.name} · {powerLevel}
           </Link>
           <Link

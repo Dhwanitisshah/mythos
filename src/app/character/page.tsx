@@ -4,10 +4,12 @@ import { createClient } from "@/utils/supabase/server";
 import { STAT_NAMES, type StatName } from "@/lib/ai";
 import { KINGDOM_KEYS, isKingdomKey } from "@/lib/kingdoms";
 import { computePowerLevel, rankFor, tierIndexByName } from "@/lib/rank";
+import { DEFAULT_AVATAR_STYLE, generateAvatarSvg, isAvatarStyleKey } from "@/lib/avatar";
 import { AutoChapterToggle } from "./auto-chapter-toggle";
 import { AscensionReveal } from "./ascension-reveal";
 import { PowerRing } from "./power-ring";
 import { TierLadder } from "./tier-ladder";
+import { AvatarPicker } from "./avatar-picker";
 
 const DEFAULT_STATS: Record<StatName, number> = {
   discipline: 10,
@@ -32,7 +34,7 @@ export default async function CharacterPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("onboarded_at, auto_chapter, last_acknowledged_tier")
+    .select("onboarded_at, auto_chapter, last_acknowledged_tier, avatar_style, avatar_seed")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -64,6 +66,10 @@ export default async function CharacterPage() {
 
   const powerLevel = computePowerLevel({ stats, kingdomStates });
   const rank = rankFor(powerLevel);
+
+  const avatarStyle = isAvatarStyleKey(profile.avatar_style) ? profile.avatar_style : DEFAULT_AVATAR_STYLE;
+  const avatarSeed = profile.avatar_seed ?? user.id;
+  const avatarSvg = generateAvatarSvg(avatarStyle, avatarSeed);
 
   const lastAcknowledgedIndex = tierIndexByName(profile.last_acknowledged_tier ?? null);
   const isFirstEverLoad = profile.last_acknowledged_tier == null;
@@ -139,6 +145,15 @@ export default async function CharacterPage() {
           </div>
           <TierLadder currentIndex={rank.index} />
         </div>
+      </section>
+
+      <section className="flex flex-col gap-4 rounded-lg border border-ink-border bg-ink-raised/50 p-5">
+        <AvatarPicker
+          initialStyle={avatarStyle}
+          initialSeed={avatarSeed}
+          initialSvg={avatarSvg}
+          rank={rank}
+        />
       </section>
 
       <section className="rounded-lg border border-ink-border bg-ink-raised/50 p-4">
